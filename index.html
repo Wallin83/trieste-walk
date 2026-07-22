@@ -307,6 +307,7 @@ nav button.active{color:var(--sea);}
         <div class="hint" id="offlineInfo"></div>
       </div>
       <button id="btnOffline" class="btn-primary" style="width:100%; margin-top:8px;"></button>
+      <button id="btnRefreshTiles" style="width:100%; margin-top:8px;"></button>
     </div>
 
     <div class="card">
@@ -347,7 +348,9 @@ da:{
   lblGps:"GPS-status", btnCompass:"Aktivér kompas",
   compassHint:"På iPhone skal kompasset have din tilladelse først.",
   lblOffline:"Offline", btnOffline:"Hent kort til offline-brug", btnOfflineBusy:"Henter … {p} %",
-  offlineHint:"Henter ca. 5 MB kortudsnit for den valgte bys rute. Fortællinger og GPS virker allerede uden internet – oplæsning kræver blot en hentet stemme på telefonen.",
+  offlineHint:"Henter ca. 5 MB kortudsnit for den valgte bys rute. Fortællinger og GPS virker allerede uden internet – oplæsning kræver blot en hentet stemme på telefonen. Appen og turene opdaterer sig selv automatisk, når der er internet.",
+  btnRefreshTiles:"Forny offline-kort (hent forfra)",
+  refreshTilesConfirm:"Sletter alle gemte kortfliser (begge byer) og henter kortet for den valgte by forfra. Fortsæt?",
   offlineDone:"Offline-kort er hentet ✓ Appen virker nu uden internet.",
   offlineFail:"Nogle kortfliser kunne ikke hentes – prøv igen på wi-fi.",
   offlineNoSw:"Offline kræver HTTPS – det virker på jeres webadresse, men ikke fra en lokal fil.",
@@ -401,7 +404,9 @@ en:{
   lblGps:"GPS status", btnCompass:"Enable compass",
   compassHint:"On iPhone the compass needs your permission first.",
   lblOffline:"Offline", btnOffline:"Download maps for offline use", btnOfflineBusy:"Downloading … {p} %",
-  offlineHint:"Downloads ~5 MB of map tiles for the selected city's route. Stories and GPS already work without internet – narration just requires a downloaded voice on the phone.",
+  offlineHint:"Downloads ~5 MB of map tiles for the selected city's route. Stories and GPS already work without internet – narration just requires a downloaded voice on the phone. The app and tours update automatically whenever you're online.",
+  btnRefreshTiles:"Refresh offline maps (re-download)",
+  refreshTilesConfirm:"Deletes all stored map tiles (both cities) and re-downloads the map for the selected city. Continue?",
   offlineDone:"Offline maps downloaded ✓ The app now works without internet.",
   offlineFail:"Some map tiles failed to download – try again on wi-fi.",
   offlineNoSw:"Offline requires HTTPS – it works on your web address, but not from a local file.",
@@ -1136,6 +1141,7 @@ function applyLanguage(){
   set("lblRate","lblRate"); set("lblVolume","lblVolume"); set("lblVoice","lblVoice");
   set("lblGps","lblGps"); set("btnCompassPerm","btnCompass"); set("compassHint","compassHint");
   set("lblOffline","lblOffline"); set("btnOffline","btnOffline");
+  set("btnRefreshTiles","btnRefreshTiles");
   set("btnResetApp","resetApp");
   document.getElementById("aboutTitle").textContent=t("aboutTitle");
   document.getElementById("aboutText").textContent=L8(tour.about);
@@ -1436,6 +1442,17 @@ async function downloadOffline(){
   }
 }
 document.getElementById("btnOffline").addEventListener("click",downloadOffline);
+
+// Fornyer kortfliserne: rydder flise-cachen og henter den valgte bys kort forfra
+async function refreshTiles(){
+  if(!("caches" in window)){ toast(t("offlineNoSw")); return; }
+  if(!confirm(t("refreshTilesConfirm"))) return;
+  try{ await caches.delete("trieste-tiles-v1"); }catch(e){}
+  Object.keys(state.tours).forEach(k=>{ state.tours[k].offlineReady=false; });
+  saveState();
+  downloadOffline();
+}
+document.getElementById("btnRefreshTiles").addEventListener("click",refreshTiles);
 
 /* ============================================================
    15) OPSTART
