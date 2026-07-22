@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#175E63">
+<title>Trieste City Walk</title>
+
+<!-- ============================================================
+     TRIESTE CITY WALK
+     Selvguidet gåtur med kort, GPS og dansk lydguide.
+     Én fil: HTML + CSS + Vanilla JavaScript.
+     Biblioteker: Leaflet (CDN) + OpenStreetMap-fliser.
+     Lyd: Web Speech API. Position: Geolocation API.
+     ============================================================ -->
+
+<!-- Leaflet fra CDN (kort). Hvis CDN fejler, håndteres det pænt i JS. -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- Skrifttype med fallback til systemskrifter -->
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&display=swap">
+
+<style>
+/* ============================================================
+   DESIGNTOKENS — varmt adriaterhavs-udtryk:
+   dyb havgrøn/blå, kalksten, terracotta og okker.
+   Mørk tilstand følger telefonens tema automatisk.
+   ============================================================ */
+:root{
+  --sea:#175E63;          /* Adriaterhavet, dyb */
+  --sea-deep:#0E3F44;
+  --stone:#F5EFE4;        /* kalksten / baggrund */
+  --card:#FFFFFF;
+  --ink:#22303A;          /* primær tekst */
+  --ink-soft:#5B6B75;
+  --terra:#C0603A;        /* terracotta-accent */
+  --ochre:#C2953C;        /* okker – "du er fremme" */
+  --line:#E4DCCB;
+  --ok:#2E7D5B;
+  --radius:18px;
+  --shadow:0 4px 16px rgba(20,50,60,.10);
+  --nav-h:66px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --sea:#3FA8AE;
+    --sea-deep:#8FD6DA;
+    --stone:#101A20;
+    --card:#1A262E;
+    --ink:#ECF1F2;
+    --ink-soft:#9AAAB2;
+    --terra:#E08A63;
+    --ochre:#D9B25F;
+    --line:#2C3A43;
+    --shadow:0 4px 16px rgba(0,0,0,.35);
+  }
+}
+
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+html,body{margin:0; padding:0; height:100%; overflow-x:hidden;}
+body{
+  font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background:var(--stone); color:var(--ink);
+  font-size:17px; line-height:1.55;
+  padding-bottom:calc(var(--nav-h) + env(safe-area-inset-bottom));
+}
+h1,h2,h3,.display{font-family:"Fraunces", Georgia, serif;}
+
+/* ---------- Toptavle med fremdrift ---------- */
+header{
+  position:sticky; top:0; z-index:900;
+  background:var(--sea); color:#fff;
+  padding:calc(10px + env(safe-area-inset-top)) 16px 12px;
+  box-shadow:0 2px 10px rgba(0,0,0,.18);
+}
+@media (prefers-color-scheme: dark){ header{background:#153A40; color:#ECF1F2;} }
+header .row{display:flex; justify-content:space-between; align-items:baseline; gap:10px;}
+header h1{margin:0; font-size:1.15rem; font-weight:700; letter-spacing:.02em;}
+header .sub{font-size:.85rem; opacity:.85;}
+.progress-wrap{margin-top:8px;}
+.progress-bar{height:8px; background:rgba(255,255,255,.25); border-radius:99px; overflow:hidden;}
+.progress-fill{height:100%; width:0%; background:var(--ochre); border-radius:99px; transition:width .4s ease;}
+.progress-meta{display:flex; justify-content:space-between; font-size:.8rem; margin-top:5px; opacity:.92;}
+
+/* ---------- Visninger ---------- */
+.view{display:none; animation:fadein .25s ease;}
+.view.active{display:block;}
+@keyframes fadein{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;}}
+.pad{padding:16px;}
+
+/* ---------- Kort ---------- */
+#mapWrap{position:relative;}
+#map{height:calc(100dvh - 210px - var(--nav-h)); min-height:340px; z-index:1; background:#CFE3E1;}
+.map-fallback{display:flex; align-items:center; justify-content:center; text-align:center;
+  height:340px; padding:24px; color:var(--ink-soft);}
+.map-buttons{
+  position:absolute; left:0; right:0; bottom:12px; z-index:500;
+  display:flex; gap:10px; padding:0 12px;
+}
+.map-buttons button{flex:1;}
+.map-info{
+  position:absolute; top:10px; left:50%; transform:translateX(-50%); z-index:500;
+  background:var(--card); color:var(--ink); border:1px solid var(--line);
+  border-radius:99px; padding:7px 16px; font-size:.85rem; box-shadow:var(--shadow);
+  white-space:nowrap; max-width:92%; overflow:hidden; text-overflow:ellipsis;
+}
+/* Kompas-indikator */
+#compass{
+  position:absolute; top:54px; right:12px; z-index:500;
+  width:46px; height:46px; border-radius:50%;
+  background:var(--card); border:1px solid var(--line); box-shadow:var(--shadow);
+  display:none; align-items:center; justify-content:center;
+}
+#compassNeedle{font-size:1.3rem; transition:transform .2s ease; display:block;}
+
+/* Nummererede markører på kortet */
+.stop-marker{
+  background:var(--sea); color:#fff; border:2px solid #fff;
+  width:32px; height:32px; border-radius:50% 50% 50% 4px;
+  display:flex; align-items:center; justify-content:center;
+  font-weight:700; font-size:.95rem; box-shadow:0 2px 6px rgba(0,0,0,.35);
+  transform:rotate(-45deg);
+}
+.stop-marker span{transform:rotate(45deg);}
+.stop-marker.done{background:var(--ok);}
+.stop-marker.here{background:var(--terra);}
+.leaflet-popup-content{font-size:1rem;}
+.leaflet-popup-content button{margin-top:8px; width:100%;}
+
+/* ---------- Knapper ---------- */
+button{
+  font:inherit; border:none; cursor:pointer;
+  border-radius:14px; padding:14px 18px; font-size:1rem; font-weight:600;
+  background:var(--card); color:var(--ink);
+  box-shadow:var(--shadow); border:1px solid var(--line);
+  min-height:50px;
+}
+button:active{transform:scale(.985);}
+.btn-primary{background:var(--sea); color:#fff; border:none;}
+.btn-terra{background:var(--terra); color:#fff; border:none;}
+.btn-ghost{background:transparent; box-shadow:none;}
+.btn-row{display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;}
+.btn-row button{flex:1; min-width:120px;}
+button:disabled{opacity:.45;}
+.pulse{animation:pulse 1.4s ease infinite;}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(192,96,58,.55);} 50%{box-shadow:0 0 0 12px rgba(192,96,58,0);}}
+
+/* ---------- Stop-kort ---------- */
+.card{
+  background:var(--card); border:1px solid var(--line);
+  border-radius:var(--radius); box-shadow:var(--shadow);
+  padding:18px; margin-bottom:16px;
+}
+.stop-head{display:flex; align-items:center; gap:12px;}
+.stop-num{
+  flex:none; width:44px; height:44px; border-radius:50%;
+  background:var(--sea); color:#fff; display:flex; align-items:center; justify-content:center;
+  font-family:"Fraunces", Georgia, serif; font-size:1.25rem; font-weight:700;
+}
+.stop-num.done{background:var(--ok);}
+.stop-title{margin:0; font-size:1.3rem; line-height:1.25;}
+.badges{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;}
+.badge{font-size:.78rem; font-weight:700; padding:4px 12px; border-radius:99px;}
+.badge.dist{background:color-mix(in srgb, var(--sea) 12%, transparent); color:var(--sea);}
+.badge.arrived{background:color-mix(in srgb, var(--ochre) 22%, transparent); color:var(--ochre);}
+.badge.done{background:color-mix(in srgb, var(--ok) 15%, transparent); color:var(--ok);}
+.badge.skipped{background:color-mix(in srgb, var(--ink-soft) 18%, transparent); color:var(--ink-soft);}
+.badge.speaking{background:color-mix(in srgb, var(--terra) 18%, transparent); color:var(--terra);}
+.intro{color:var(--ink-soft); margin:10px 0 0;}
+.story{margin-top:12px;}
+.story p{margin:0 0 10px;}
+.lookfor{margin:12px 0 0; padding:12px 14px; border-radius:12px;
+  background:color-mix(in srgb, var(--ochre) 10%, transparent);
+  border:1px dashed color-mix(in srgb, var(--ochre) 55%, transparent);}
+.lookfor h3{margin:0 0 6px; font-size:1rem;}
+.lookfor ul{margin:0; padding-left:20px;}
+.lookfor li{margin-bottom:4px;}
+details.story-box{margin-top:12px;}
+details.story-box summary{font-weight:700; cursor:pointer; color:var(--sea); padding:6px 0;}
+
+/* Liste over alle stop */
+.stop-row{
+  display:flex; align-items:center; gap:12px; width:100%;
+  text-align:left; padding:14px; margin-bottom:10px;
+}
+.stop-row .grow{flex:1; min-width:0;}
+.stop-row .name{font-weight:700;}
+.stop-row .meta{font-size:.82rem; color:var(--ink-soft);}
+.stop-row .chev{color:var(--ink-soft);}
+
+/* ---------- Indstillinger ---------- */
+.setting{margin-bottom:20px;}
+.setting label{display:block; font-weight:700; margin-bottom:6px;}
+input[type=range]{width:100%; accent-color:var(--sea); height:34px;}
+.hint{font-size:.85rem; color:var(--ink-soft); margin-top:4px;}
+
+/* ---------- Bundmenu ---------- */
+nav{
+  position:fixed; left:0; right:0; bottom:0; z-index:1000;
+  display:flex; background:var(--card); border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom);
+  box-shadow:0 -2px 12px rgba(0,0,0,.08);
+}
+nav button{
+  flex:1; background:none; border:none; box-shadow:none; border-radius:0;
+  display:flex; flex-direction:column; align-items:center; gap:2px;
+  padding:9px 4px 7px; font-size:.72rem; font-weight:600; color:var(--ink-soft);
+  min-height:var(--nav-h);
+}
+nav button .ico{font-size:1.35rem; line-height:1;}
+nav button.active{color:var(--sea);}
+nav button.active .ico{transform:translateY(-1px);}
+
+/* ---------- Toast ---------- */
+#toast{
+  position:fixed; left:50%; bottom:calc(var(--nav-h) + 18px + env(safe-area-inset-bottom));
+  transform:translateX(-50%) translateY(20px);
+  background:var(--sea-deep); color:#fff; padding:12px 20px; border-radius:14px;
+  font-size:.95rem; box-shadow:var(--shadow); opacity:0; pointer-events:none;
+  transition:all .3s ease; z-index:1100; max-width:88%; text-align:center;
+}
+@media (prefers-color-scheme: dark){ #toast{background:#245A60;} }
+#toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+@media (prefers-reduced-motion: reduce){
+  *{animation:none !important; transition:none !important;}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ TOPTAVLE: fremdrift og status ============ -->
+<header>
+  <div class="row">
+    <h1>Trieste City Walk</h1>
+    <span class="sub" id="hdrRemaining">–</span>
+  </div>
+  <div class="row" style="margin-top:2px;">
+    <span class="sub" id="hdrCurrent">Nu: –</span>
+    <span class="sub" id="hdrNext">Næste: –</span>
+  </div>
+  <div class="progress-wrap">
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-meta">
+      <span id="hdrDone">0 af 10 stop</span>
+      <span id="hdrPct">0 %</span>
+    </div>
+  </div>
+</header>
+
+<!-- ============ VISNING: KORT ============ -->
+<section id="view-map" class="view active">
+  <div id="mapWrap">
+    <div id="map"></div>
+    <div class="map-info" id="mapInfo">Venter på GPS …</div>
+    <div id="compass" aria-hidden="true"><span id="compassNeedle">🧭</span></div>
+    <div class="map-buttons">
+      <button class="btn-primary" id="btnMyPos">Vis min position</button>
+      <button class="btn-terra" id="btnNextStop">Centrér på næste stop</button>
+    </div>
+  </div>
+  <div class="pad">
+    <div class="card" id="gpsNote">
+      <strong>Tip om GPS:</strong> Din placering kræver normalt, at siden åbnes via
+      <em>HTTPS</em> (eller localhost). Åbner du filen direkte fra telefonen, virker
+      hele guiden stadig – du ser bare ikke din egen prik på kortet.
+    </div>
+  </div>
+</section>
+
+<!-- ============ VISNING: AKTUELT STOP ============ -->
+<section id="view-current" class="view">
+  <div class="pad" id="currentStopContainer"></div>
+</section>
+
+<!-- ============ VISNING: ALLE STOP ============ -->
+<section id="view-all" class="view">
+  <div class="pad">
+    <h2 class="display" style="margin:4px 0 4px;">Hele ruten</h2>
+    <p class="hint" id="routeSummary" style="margin:0 0 14px;"></p>
+    <div id="allStopsContainer"></div>
+    <button class="btn-ghost" id="btnReset" style="width:100%; color:var(--terra); margin-top:8px;">
+      Nulstil hele turen
+    </button>
+  </div>
+</section>
+
+<!-- ============ VISNING: INDSTILLINGER ============ -->
+<section id="view-settings" class="view">
+  <div class="pad">
+    <h2 class="display" style="margin:4px 0 16px;">Indstillinger</h2>
+
+    <div class="card">
+      <div class="setting">
+        <label for="rate">Talehastighed: <span id="rateVal">1,0×</span></label>
+        <input type="range" id="rate" min="0.6" max="1.4" step="0.1" value="1">
+      </div>
+      <div class="setting">
+        <label for="volume">Lydstyrke: <span id="volVal">100 %</span></label>
+        <input type="range" id="volume" min="0" max="1" step="0.1" value="1">
+      </div>
+      <div class="setting" style="margin-bottom:6px;">
+        <label>Oplæsningsstemme</label>
+        <div class="hint" id="voiceInfo">Undersøger tilgængelige stemmer …</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="setting" style="margin-bottom:6px;">
+        <label>GPS-status</label>
+        <div class="hint" id="gpsInfo">Venter på position …</div>
+      </div>
+      <button id="btnCompassPerm" style="width:100%; margin-top:8px;">Aktivér kompas</button>
+      <div class="hint" style="margin-top:6px;">På iPhone skal kompasset have din tilladelse først.</div>
+    </div>
+
+    <div class="card">
+      <strong>Om turen</strong>
+      <p class="hint" style="margin:8px 0 0;">
+        Ca. 3,5 km til fods gennem Triestes historiske centrum – regn med 2–3 timer
+        med stop, is og pauser. Turen starter og slutter ved The Modernist Hotel,
+        Corso Italia 12. God tur!
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ BUNDMENU ============ -->
+<nav>
+  <button data-view="view-map" class="active"><span class="ico">🗺️</span>Kort</button>
+  <button data-view="view-current"><span class="ico">📍</span>Aktuelt stop</button>
+  <button data-view="view-all"><span class="ico">🚶</span>Alle stop</button>
+  <button data-view="view-settings"><span class="ico">⚙️</span>Indstillinger</button>
+</nav>
+
+<div id="toast" role="status"></div>
+
+<script>
+/* ============================================================
+   1) RUTEDATA
+   Ti stop med koordinater, intro, fortælling (til oplæsning),
+   "se efter"-punkter og estimeret gåtid til næste stop.
+   ============================================================ */
+const STOPS = [
+{
+  id:0, name:"The Modernist Hotel", lat:45.64998, lng:13.77299, walkMin:3,
+  intro:"Vores startpunkt på Corso Italia – midt i byens hjerte.",
+  lookFor:[
+    "De brede fortove og sporvognsskinnerne på Corso Italia",
+    "Mågerne – Triestes højlydte indbyggere nummer ét",
+    "Vinden! Kan du mærke, om boraen er på besøg i dag?"
+  ],
+  story:`Velkommen til Trieste – og velkommen til jeres helt egen byvandring! Vi står nu foran The Modernist Hotel på Corso Italia, en af byens store handelsgader. Herfra går vi de næste par timer gennem en by, der er noget helt særligt i Italien.
+Trieste ligger nemlig klemt inde mellem høje klipper og det blå Adriaterhav, helt ude i Italiens østligste hjørne – Slovenien er kun få kilometer væk. I næsten 500 år hørte byen slet ikke til Italien, men til det store østrigske kejserrige. Kejseren i Wien havde brug for en havn, og Trieste blev hans vindue mod havet. Derfor ligner byen på mange måder mere Wien end Rom: store, prægtige bygninger, kaffehuse og brede gader.
+Og så er der vinden! Trieste er berømt for boraen – en iskold vind, der kommer farende ned fra bjergene og kan blæse med over 150 kilometer i timen. Når den er værst, spænder man reb ud i gaderne, så folk har noget at holde fast i. Prøv lige at mærke efter: Blæser det i dag?
+En sidste ting, inden vi går: Trieste er Italiens kaffehovedstad. Skibene har bragt kaffebønner hertil i hundredvis af år, og byens berømte kaffemærke illy kender man i hele verden. Så dufter det af kaffe undervejs, er det helt normalt.
+Klar? Så går vi mod første plads – det tager kun et par minutter.`
+},
+{
+  id:1, name:"Piazza della Borsa", lat:45.65034, lng:13.77021, walkMin:3,
+  intro:"Byens gamle handelsplads med børsen, der ligner et græsk tempel.",
+  lookFor:[
+    "Den gamle børsbygning med de store søjler – prøv at tælle dem",
+    "Neptunstatuen med sin trefork",
+    "Tergesteo-bygningen med den fine glasoverdækkede passage"
+  ],
+  story:`Nu står vi på Piazza della Borsa – Børspladsen. For to hundrede år siden var det her, byens rigdom blev skabt. Kig på den store hvide bygning, der ligner et græsk tempel med høje søjler foran. Det er den gamle børs fra 1806. Herinde stod købmænd og råbte i munden på hinanden, mens de handlede med alt det, skibene bragte til havnen: kaffe, krydderier, stof, korn og meget mere.
+Prøv at tælle søjlerne på bygningen – hvor mange kan du finde? De skulle få købmændene til at føle, at de handlede i et tempel, næsten som om penge var noget helligt.
+Midt på pladsen finder du en statue af Neptun, havets gud med sit lange skæg og sin trefork. Det er selvfølgelig ikke tilfældigt: Alt i Trieste handlede om havet. Uden skibene – ingen by.
+Læg også mærke til bygningen Tergesteo ved siden af, med en fin passage af glas indeni. Tergeste var faktisk byens navn i romertiden, for Trieste er langt ældre end de fleste tror – det vender vi tilbage til om lidt, når vi møder romerne.
+En lille historie til turen: Når boravinden raser om vinteren, kan den vælte skraldespande, cykler og næsten også mennesker her på de åbne pladser. Derfor gik triesterne i gamle dage med sten i lommerne, siges det – så de ikke blæste væk! Om det passer? Det må du selv vurdere.
+Nu går vi videre til byens allerstørste stjerne: en plads, der er åben helt ud mod havet.`
+},
+{
+  id:2, name:"Piazza Unità d'Italia", lat:45.65008, lng:13.76776, walkMin:5,
+  intro:"Europas største plads med åbent hav på den ene side.",
+  lookFor:[
+    "De to bronzefigurer øverst på rådhusets klokketårn",
+    "De Fire Kontinenters Fontæne – hvilke verdensdele mangler?",
+    "De små blå lys i belægningen, når det bliver mørkt"
+  ],
+  story:`Wow – kig engang! Du står nu på Piazza Unità d'Italia, og den er noget helt særligt: Det er Europas største plads, der ligger direkte ud til havet. På tre sider er du omgivet af kæmpestore paladser, og på den fjerde side er der bare … hav. Blåt, glitrende Adriaterhav, så langt øjet rækker.
+Bygningerne her blev opført, da Trieste var østrigernes fine havneby, og de skulle vise hele verden, hvor rig byen var. Vend dig mod den store bygning med klokketårnet – det er rådhuset. Øverst oppe står to bronzefigurer, som triesterne kalder Mikeze og Jakeze. De har slået timeslag på klokken i over hundrede år. Kan du få øje på dem deroppe?
+Find nu den gamle fontæne på pladsen: De Fire Kontinenters Fontæne. Da den blev bygget i 1750'erne, kendte man kun fire verdensdele – Europa, Asien, Afrika og Amerika. Her er en opgave: Hvilke verdensdele mangler? Rigtigt – Australien og Antarktis var endnu ikke opdaget af europæerne!
+Pladsen har oplevet både fest og alvor. Kejsere og konger har holdt taler her, og i dag samles folk til koncerter og fodboldfejringer. Når det bliver aften, tændes små blå lys i belægningen – de skal minde om, at havet engang gik helt herop.
+Og en sjov detalje: Forfatteren James Joyce, en af verdens mest berømte, boede mange år i Trieste og drak kaffe i caféerne heromkring. Ham møder vi igen senere på turen – som statue!
+Nu skal vi helt ud over vandet. Bogstaveligt talt.`
+},
+{
+  id:3, name:"Molo Audace", lat:45.65258, lng:13.76549, walkMin:9,
+  intro:"En 246 meter lang mole – en gåtur lige ud i Adriaterhavet.",
+  lookFor:[
+    "Vindrosen af bronze ude for enden af molen",
+    "Skibe, færger og måske et kæmpe krydstogtskib",
+    "Miramare-slottet langt ude ad kysten mod nordvest"
+  ],
+  story:`Nu går vi en tur på havet – uden at blive våde! Molo Audace er en 246 meter lang stenmole, der stikker lige ud i Adriaterhavet. Gå med helt ud til enden, det er det hele værd.
+Molen gemmer på en hemmelighed: Den er bygget oven på et skibsvrag! I 1740 sank skibet San Carlo netop her i havnen. I stedet for at fjerne vraget brugte man det som fundament og byggede molen henover. Så lige nu går du faktisk oven på et rigtigt, gammelt skib.
+Navnet Audace kom til i 1918, ved Første Verdenskrigs afslutning. Da krigen sluttede, og Trieste efter næsten 500 år under Østrig skulle være italiensk, var det italienske krigsskib Audace det allerførste, der lagde til – præcis her ved molen. Det var en kæmpe dag for byen, og molen fik skibets navn.
+Ude for enden finder du en vindrose af bronze i belægningen – en slags kompas, der viser alle vindretninger. Den er støbt af bronze fra en erobret kanon. Stil dig på den og find ud af: Hvilken vej er nord? Det er dén vej, boravinden kommer fra!
+Kig så ud over vandet. Mod nordvest, langt ude ad kysten, kan man i klart vejr skimte det hvide eventyrslot Miramare, bygget af en østrigsk ærkehertug. Og overalt: skibe, sejlbåde, måger. Om aftenen sidder halvdelen af Trieste herude med benene ud over kanten og ser solen gå ned.
+Næste stop er noget helt andet: Nu rejser vi 2000 år tilbage i tiden.`
+},
+{
+  id:4, name:"Teatro Romano", lat:45.64911, lng:13.77181, walkMin:4,
+  intro:"Et rigtigt romersk teater midt i byen – 2000 år gammelt.",
+  lookFor:[
+    "De halvcirkelformede stenrækker, hvor publikum sad",
+    "Resterne af scenen nederst",
+    "San Giusto-bakken, der rejser sig bag teatret – dér skal vi op senere"
+  ],
+  story:`Kan du se stentrapperne foran dig, formet som en kæmpe halvcirkel? Du står ved Teatro Romano – et ægte romersk teater, bygget for cirka 2000 år siden, da byen hed Tergeste og var en travl romersk havneby.
+Prøv at forestille dig en sommeraften dengang: Op mod 3.500 mennesker sidder tæt på stenrækkerne. Nederst, på scenen, står skuespillere med store, malede masker – glade masker til komedier, triste masker til tragedier. Maskerne gjorde det let at se selv fra bagerste række, om figuren var sjov eller sørgelig. Der var ingen mikrofoner, men teatret er bygget så snedigt, at lyden bar hele vejen op. Dengang lå havet i øvrigt næsten helt herinde – publikum kunne høre bølgerne bag scenen!
+Og nu til den vildeste del af historien: Teatret forsvandt! Gennem århundrederne byggede folk simpelthen huse oven på og rundt om det, og til sidst var det næsten glemt – man kendte det kun fra gamle skrifter. Først i 1938, da man rev nogle gamle bygninger ned, dukkede hele teatret frem igen. Forestil dig at rive et hus ned og finde et helt romersk teater nedenunder!
+Her er en opgave: Hvis du skulle sidde her til forestilling, hvilken række ville du vælge – helt nede foran ved scenen eller højt oppe med udsigt? Om sommeren bruges teatret faktisk stadig til koncerter, præcis som for 2000 år siden.
+Vi bliver i romertiden lidt endnu. Næste stop er en gammel port, gemt i de smalle gyder.`
+},
+{
+  id:5, name:"Arco di Riccardo", lat:45.64781, lng:13.76889, walkMin:8,
+  intro:"En romersk byport, klemt inde mellem husene i den gamle bydel.",
+  lookFor:[
+    "De store, slidte stenblokke – over 2000 år gamle",
+    "Hvordan husene er bygget helt ind mod buen",
+    "De smalle gyder – sådan så hele byen ud i middelalderen"
+  ],
+  story:`Her, midt i en lille hyggelig plads mellem gamle huse, står en kæmpe stenbue: Arco di Riccardo, Richards Bue. Den er over 2000 år gammel og var engang en port i den romerske bymur. Dengang gik man herigennem for at komme ind i byen Tergeste – måske på vej til torvet eller op til templerne på bakken.
+Gå helt hen og læg din hånd forsigtigt på stenen. Tænk over det et øjeblik: Du rører ved noget, som romerske børn, soldater, købmænd og æsler er gået forbi og har rørt ved for to tusind år siden. Er det ikke vildt?
+Men hvorfor hedder den Richards Bue? Her bliver det sjovt, for det er der ingen, der ved med sikkerhed! Et gammelt sagn fortæller, at den engelske konge Richard Løvehjerte blev holdt fanget her i byen, da han var på vej hjem fra korstog – og at buen blev opkaldt efter ham. Historikerne ryster dog på hovedet: Han var nok aldrig i Trieste. Måske kommer navnet i virkeligheden af det latinske ord cardo, som var navnet på hovedgaden i romerske byer. Hvad tror du selv? Kongesagnet er nu meget sjovere, ikke?
+Læg mærke til, hvordan husene gennem århundrederne er bygget helt op ad buen – nogle vægge rører den næsten. Man byggede simpelthen byen videre rundt om det gamle.
+Nu venter turens hårdeste – og flotteste – etape: Vi skal op ad bakken til katedralen. Det stiger et godt stykke, så tag den i roligt tempo. Belønningen på toppen er byens bedste udsigt!`
+},
+{
+  id:6, name:"Cattedrale di San Giusto", lat:45.64654, lng:13.77245, walkMin:10,
+  intro:"Katedralen på bakketoppen – to kirker, der blev til én, og byens bedste udsigt.",
+  lookFor:[
+    "Den store rosenvindue-'blomst' af sten på facaden",
+    "Guldmosaikkerne inde i kirken – smid en euro i automaten, så tændes lyset",
+    "Udsigten! Kan du finde Molo Audace dernede, hvor vi stod før?"
+  ],
+  story:`Pyha – godt gået, I klarede bakken! Velkommen til toppen af San Giusto-bakken, det allerældste Trieste. Her lå først en keltisk landsby, så romernes templer, og nu: byens katedral.
+Kig godt på kirkens facade. Kan du se, at den ser lidt … skæv ud? Det er der en god grund til. For omkring 700 år siden lå her to kirker side om side. Så fik man en idé: Hvorfor ikke bygge dem sammen til én stor katedral? Man byggede simpelthen et stykke imellem dem – og derfor er facaden ikke helt symmetrisk. Kirken er bogstaveligt talt to kirker limet sammen!
+Midt på facaden sidder et kæmpe rundt vindue af sten, formet som en blomst med mange blade. Det kaldes et rosenvindue. Går I indenfor, skal I finde de gyldne mosaikker i loftet – billeder lavet af tusindvis af bittesmå guldstumper for over 800 år siden. De glimter magisk, når lyset tændes. Se også efter de romerske gravsten, der er muret ind i klokketårnet – genbrug på den helt gamle måde.
+Ved siden af kirken ligger en rigtig fæstning, Castello di San Giusto, med mure og kanoner.
+Men det bedste heroppe er gratis: udsigten! Gå hen til kanten og find ud af, hvad I kan genkende. Kan du få øje på Molo Audace, hvor vi stod ude over vandet? Og den store Piazza Unità? Hele byen ligger for dine fødder, med de røde tage ned mod det blå hav.
+Når I har nydt udsigten, går vi nedad igen – ned til det sted, hvor Trieste ligner Venedig.`
+},
+{
+  id:7, name:"Canal Grande", lat:45.65210, lng:13.77080, walkMin:2,
+  intro:"Kanalen, hvor sejlskibene sejlede lige ind midt i byen.",
+  lookFor:[
+    "Statuen af James Joyce på Ponte Rosso – manden med hat og stok",
+    "De blå kupler på den serbisk-ortodokse kirke San Spiridione",
+    "Små både, der vugger i kanalen"
+  ],
+  story:`Nu er vi nede fra bakken igen – og pludselig ligner Trieste en lille udgave af Venedig! Foran dig ligger Canal Grande, den store kanal, med farverige huse på begge sider og små både, der vugger i vandet.
+Kanalen er ikke naturlig. Den blev gravet i 1750'erne, i byens rigeste tid, med ét smart formål: Sejlskibene skulle kunne sejle lige ind i midten af byen og losse deres varer direkte ved købmændenes pakhuse. Forestil dig store sejlskibe her, hvor der nu ligger småbåde – med sække af kaffe, tønder og stofruller, der blev hejst i land, mens folk råbte på alle mulige sprog.
+Gå hen til broen, der hedder Ponte Rosso – Den Røde Bro. Her står en bronzestatue af en tynd mand med hat, briller og stok, midt i sit skridt over broen. Det er James Joyce, den verdensberømte irske forfatter. Han boede over ti år i Trieste, underviste i engelsk og skrev på sine bøger på byens caféer. Han elskede byen. Gå hen og hils på ham – I må gerne give ham hånden, det gør alle!
+Kig så efter en bygning med skinnende blå kupler tæt ved kanalen. Det er San Spiridione, en serbisk-ortodoks kirke. Den minder os om, at Trieste altid har været en blandet by: Her boede italienere, østrigere, grækere, serbere, jøder og mange flere side om side – og det kan man stadig se på byens kirker.
+Vores næste stop står for enden af kanalen og er umulig at overse. Den ligner et græsk tempel!`
+},
+{
+  id:8, name:"Chiesa di Sant'Antonio Nuovo", lat:45.65160, lng:13.77230, walkMin:3,
+  intro:"Byens største kirke – som et græsk tempel for enden af kanalen.",
+  lookFor:[
+    "De seks kæmpesøjler – tæl selv efter!",
+    "Statuerne af helgener øverst oppe på taget",
+    "Den flotte spejling af kirken i kanalens vand"
+  ],
+  story:`Se lige den bygning! For enden af kanalen troner Sant'Antonio Nuovo – Triestes største kirke. Men ligner den egentlig en kirke? Den ligner da nærmere et gammelt græsk tempel, med en trappe op til seks enorme søjler og en stor trekant øverst.
+Prøv at tælle søjlerne: Er der virkelig seks? Og kig så helt op på taget – deroppe står en række statuer af helgener og kigger ud over byen. Bag dem gemmer sig en stor grønlig kuppel.
+Kirken blev bygget færdig i 1849, i en tid hvor man i Europa var helt vilde med alt, der lignede det gamle Grækenland og Rom. Stilen kaldes nyklassicisme – "ny-klassisk" – altså nyt byggeri, der ligner de klassiske, gamle templer. Måske minder den dig om Pantheon i Rom, hvis du har set billeder af det.
+Placeringen er ingen tilfældighed. Kirken står præcis for enden af Canal Grande, så søfolkene kunne se den, allerede når de sejlede ind i kanalen. Efter en lang og farlig sejlads var det første, de mødte i Trieste, en kirke – et sted at sige tak for, at de kom sikkert i havn.
+Her er en sidste opgave ved kanalen: Stil dig, så du kan se kirken spejle sig i vandet. Hvis vandet er stille, får du et perfekt spejlbillede – det er byens mest fotograferede motiv, så tag endelig et billede!
+Og nu: sidste lille etape. Hotellet ligger kun få minutters gang herfra.`
+},
+{
+  id:9, name:"Tilbage til The Modernist Hotel", lat:45.64998, lng:13.77299, walkMin:0,
+  intro:"Turen slutter, hvor den begyndte – tillykke, I klarede hele ruten!",
+  lookFor:[
+    "En café til en velfortjent kaffe eller kakao",
+    "En gelateria – I har fortjent en is!",
+    "Byen med nye øjne: Hvor mange steder fra turen kan I huske?"
+  ],
+  story:`Og så er vi tilbage, hvor vi startede – foran The Modernist Hotel. Tillykke! I har gået hele vejen gennem to tusind års historie.
+Tænk lige over, hvad I har set i dag: en børs, der ligner et tempel. Europas største plads ud mod havet, hvor to bronzefigurer slår timeslag. En mole bygget oven på et sunket skib. Et romersk teater, der lå gemt under husene i hundredvis af år. En 2000 år gammel port, som måske – måske ikke – har noget med en engelsk konge at gøre. En katedral lavet af to kirker, med guldmosaikker og byens bedste udsigt. En kanal, hvor sejlskibene sejlede lige ind i byen, med James Joyce på broen. Og et græsk tempel, der i virkeligheden er en kirke.
+Her er turens allersidste spørgsmål: Hvilket stop var din favorit? Og hvis du skulle vise ét sted frem for en ven, hvilket skulle det så være?
+I har nu i den grad fortjent en belønning. Trieste er Italiens kaffehovedstad, så de voksne bør prøve en rigtig triestinsk kaffe – bestil en "nero", hvis du vil have espresso som de lokale. Og til alle, store som små: Find en gelateria og vælg netop dén is, I har drømt om undervejs. Det er en ordre fra jeres guide!
+Tak, fordi I gik med. Trieste siger arrivederci – på gensyn. Og hvem ved: Måske blæser boraen jer tilbage hertil en dag.`
+}
+];
+
+/* ============================================================
+   2) TILSTAND + LOCALSTORAGE
+   Gemmer gennemførte/oversprungne stop, aktuelt stop og
+   lydindstillinger, så turen kan fortsættes efter genindlæsning.
+   ============================================================ */
+const LS_KEY = "trieste-city-walk-v1";
+let state = {
+  current: 0,          // indeks for aktuelt stop
+  completed: [],       // id'er på gennemførte stop
+  skipped: [],         // id'er på oversprungne stop
+  arrivedNotified: [], // stop, hvor "du er fremme" allerede er vist
+  rate: 1.0,
+  volume: 1.0
+};
+function loadState(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(raw){ state = Object.assign(state, JSON.parse(raw)); }
+  }catch(e){ /* localStorage kan være blokeret – appen virker stadig */ }
+}
+function saveState(){
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){}
+}
+
+/* ============================================================
+   3) HJÆLPEFUNKTIONER
+   ============================================================ */
+// Afstand i meter mellem to koordinater (haversine-formlen)
+function distMeters(lat1,lng1,lat2,lng2){
+  const R=6371000, rad=Math.PI/180;
+  const dLat=(lat2-lat1)*rad, dLng=(lng2-lng1)*rad;
+  const a=Math.sin(dLat/2)**2 + Math.cos(lat1*rad)*Math.cos(lat2*rad)*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+function fmtDist(m){
+  if(m==null) return "–";
+  return m<1000 ? Math.round(m)+" m" : (m/1000).toFixed(1).replace(".",",")+" km";
+}
+function toast(msg){
+  const t=document.getElementById("toast");
+  t.textContent=msg; t.classList.add("show");
+  clearTimeout(t._tm); t._tm=setTimeout(()=>t.classList.remove("show"), 3200);
+}
+function isDone(id){ return state.completed.includes(id); }
+function isSkipped(id){ return state.skipped.includes(id); }
+// Første stop, der hverken er gennemført eller sprunget over
+function nextOpenStop(){
+  return STOPS.find(s=>!isDone(s.id) && !isSkipped(s.id)) || null;
+}
+
+/* ============================================================
+   4) KORT (Leaflet + OpenStreetMap, valgfrit satellitlag)
+   Fejler CDN/nettet, vises en venlig besked i stedet.
+   ============================================================ */
+let map=null, userMarker=null, accCircle=null, stopMarkers=[];
+let userPos=null, userAcc=null;
+
+function initMap(){
+  const el=document.getElementById("map");
+  if(typeof L==="undefined"){
+    el.outerHTML='<div class="map-fallback">Kortet kunne ikke indlæses – tjek internetforbindelsen.<br>Guiden, fortællingerne og lyden virker stadig!</div>';
+    return;
+  }
+  try{
+    map=L.map("map",{zoomControl:true}).setView([45.6500,13.7700],15);
+
+    const osm=L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
+      maxZoom:19, attribution:"© OpenStreetMap-bidragydere"
+    }).addTo(map);
+    // Gratis satellitlag fra Esri World Imagery
+    const sat=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{
+      maxZoom:19, attribution:"© Esri World Imagery"
+    });
+    L.control.layers({"Kort":osm,"Satellit":sat},null,{position:"topleft"}).addTo(map);
+
+    // Rutelinje mellem alle stop (stiplet, i havfarven)
+    L.polyline(STOPS.map(s=>[s.lat,s.lng]),{
+      color:"#C0603A", weight:4, opacity:.85, dashArray:"2 8", lineCap:"round"
+    }).addTo(map);
+
+    // Nummererede markører
+    STOPS.forEach(s=>{
+      const icon=L.divIcon({className:"", iconSize:[32,32], iconAnchor:[16,30],
+        html:`<div class="stop-marker" id="marker-${s.id}"><span>${s.id+1}</span></div>`});
+      const m=L.marker([s.lat,s.lng],{icon}).addTo(map);
+      m.bindPopup(`<strong>${s.id+1}. ${s.name}</strong><br>
+        <button class="btn-primary" onclick="openStopFromMap(${s.id})">Åbn dette stop</button>`);
+      stopMarkers.push(m);
+    });
+    refreshMarkers();
+  }catch(e){
+    el.outerHTML='<div class="map-fallback">Kortet kunne ikke vises, men resten af guiden virker.</div>';
+    map=null;
+  }
+}
+// Farv markører efter status (gennemført / aktuel)
+function refreshMarkers(){
+  STOPS.forEach(s=>{
+    const el=document.getElementById("marker-"+s.id);
+    if(!el) return;
+    el.classList.toggle("done", isDone(s.id));
+    el.classList.toggle("here", s.id===state.current && !isDone(s.id));
+  });
+}
+// Kaldes fra kort-popup
+function openStopFromMap(id){
+  state.current=id; saveState();
+  if(map) map.closePopup();
+  showView("view-current");
+  renderAll();
+}
+
+/* ============================================================
+   5) GEOLOKATION
+   watchPosition() følger brugeren løbende. Alt er pakket ind,
+   så siden virker fint, selv hvis GPS afvises eller mangler.
+   ============================================================ */
+function startGeolocation(){
+  const info=document.getElementById("mapInfo");
+  const gpsInfo=document.getElementById("gpsInfo");
+  if(!("geolocation" in navigator)){
+    info.textContent="GPS understøttes ikke på denne enhed";
+    gpsInfo.textContent="Geolokation er ikke tilgængelig i denne browser.";
+    return;
+  }
+  navigator.geolocation.watchPosition(pos=>{
+    userPos={lat:pos.coords.latitude, lng:pos.coords.longitude};
+    userAcc=pos.coords.accuracy;
+    document.getElementById("gpsNote").style.display="none";
+    gpsInfo.textContent=`Position fundet. Nøjagtighed: ±${Math.round(userAcc)} m.`;
+    updateUserOnMap();
+    updateDistances();
+    checkProximity();
+  }, err=>{
+    // Venlige fejlbeskeder – siden fortsætter uden GPS
+    const msgs={1:"Placering blev afvist – guiden virker stadig uden GPS.",
+                2:"Placering er ikke tilgængelig lige nu.",
+                3:"Det tog for lang tid at finde din placering."};
+    const m=msgs[err.code]||"Placering kunne ikke hentes.";
+    info.textContent=m; gpsInfo.textContent=m+" Husk: GPS kræver normalt HTTPS.";
+  },{enableHighAccuracy:true, maximumAge:5000, timeout:15000});
+}
+function updateUserOnMap(){
+  if(!map||!userPos) return;
+  if(!userMarker){
+    userMarker=L.circleMarker([userPos.lat,userPos.lng],{
+      radius:9, color:"#fff", weight:3, fillColor:"#1B7FD4", fillOpacity:1
+    }).addTo(map).bindPopup("Her er du");
+  }else{ userMarker.setLatLng([userPos.lat,userPos.lng]); }
+  // Cirkel for GPS-nøjagtighed, hvis den kendes
+  if(userAcc!=null){
+    if(!accCircle){
+      accCircle=L.circle([userPos.lat,userPos.lng],{radius:userAcc,
+        color:"#1B7FD4", weight:1, fillColor:"#1B7FD4", fillOpacity:.12}).addTo(map);
+    }else{ accCircle.setLatLng([userPos.lat,userPos.lng]); accCircle.setRadius(userAcc); }
+  }
+}
+// Automatisk "du er fremme"-registrering (ca. 50 m radius, vises kun én gang pr. stop)
+const ARRIVE_RADIUS=50;
+function checkProximity(){
+  if(!userPos) return;
+  STOPS.forEach(s=>{
+    if(isDone(s.id) || state.arrivedNotified.includes(s.id)) return;
+    if(distMeters(userPos.lat,userPos.lng,s.lat,s.lng) <= ARRIVE_RADIUS){
+      state.arrivedNotified.push(s.id); saveState();
+      toast(`Du er fremme ved stop ${s.id+1}: ${s.name} 🎧`);
+      renderAll(); // viser "Du er fremme"-mærke og fremhæver afspilningsknappen
+    }
+  });
+}
+
+/* ============================================================
+   6) LYD – Web Speech API (dansk oplæsning)
+   Fortællingen deles op i sætninger og lægges i kø. Det gør
+   afspilningen mere stabil på mobil. Kun ét stop ad gangen.
+   ============================================================ */
+let danishVoice=null, speakingStop=null, isPaused=false;
+
+function pickVoice(){
+  if(!("speechSynthesis" in window)){
+    document.getElementById("voiceInfo").textContent="Oplæsning understøttes ikke i denne browser. Du kan stadig læse alle fortællinger selv.";
+    return;
+  }
+  const voices=speechSynthesis.getVoices();
+  danishVoice=voices.find(v=>v.lang && v.lang.toLowerCase().startsWith("da"))||null;
+  const info=document.getElementById("voiceInfo");
+  if(danishVoice){
+    info.textContent=`Dansk stemme fundet: ${danishVoice.name}.`;
+  }else if(voices.length){
+    info.textContent="Ingen dansk stemme fundet – standardstemmen bruges. Tilføj evt. en dansk Siri-stemme under Indstillinger → Tilgængelighed → Oplæst indhold.";
+  }
+}
+if("speechSynthesis" in window){
+  speechSynthesis.onvoiceschanged=pickVoice;
+}
+
+function playStop(id){
+  if(!("speechSynthesis" in window)){ toast("Oplæsning understøttes ikke – læs teksten i stedet."); return; }
+  stopSpeech();                       // stop evt. anden fortælling først
+  const s=STOPS[id];
+  speakingStop=id; isPaused=false;
+  // Del teksten i sætninger og læg dem i kø (uden lookbehind af hensyn til ældre Safari)
+  const parts=(s.story.match(/[^.!?]+[.!?]+\s*|[^.!?]+$/g)||[s.story])
+    .map(p=>p.trim()).filter(p=>p.length);
+  parts.forEach((p,i)=>{
+    const u=new SpeechSynthesisUtterance(p);
+    u.lang="da-DK";
+    if(danishVoice) u.voice=danishVoice;
+    u.rate=state.rate; u.volume=state.volume;
+    if(i===parts.length-1){ u.onend=()=>{ if(speakingStop===id){ speakingStop=null; renderAll(); } }; }
+    speechSynthesis.speak(u);
+  });
+  renderAll();
+}
+function pauseSpeech(){
+  if(!("speechSynthesis" in window)||speakingStop===null) return;
+  if(!isPaused){ speechSynthesis.pause(); isPaused=true; }
+  else{ speechSynthesis.resume(); isPaused=false; }
+  renderAll();
+}
+function stopSpeech(){
+  if("speechSynthesis" in window){ try{ speechSynthesis.cancel(); }catch(e){} }
+  speakingStop=null; isPaused=false;
+  renderAll();
+}
+
+/* ============================================================
+   7) NAVIGATION MELLEM STOP
+   ============================================================ */
+function markDone(id){
+  if(!isDone(id)) state.completed.push(id);
+  state.skipped=state.skipped.filter(x=>x!==id);
+  stopSpeech();
+  const nxt=nextOpenStop();
+  if(nxt){ state.current=nxt.id; toast(`Godt gået! Næste stop: ${nxt.name}`); }
+  else{ toast("🎉 Hele turen er gennemført – tillykke!"); }
+  saveState(); renderAll();
+}
+function skipStop(id){
+  if(!isSkipped(id)) state.skipped.push(id);
+  stopSpeech();
+  const nxt=nextOpenStop();
+  if(nxt) state.current=nxt.id;
+  toast("Stoppet er sprunget over – det kan altid genåbnes fra listen.");
+  saveState(); renderAll();
+}
+function gotoStop(id){
+  state.current=Math.max(0, Math.min(STOPS.length-1, id));
+  saveState(); renderAll();
+}
+function resetTour(){
+  if(!confirm("Vil du nulstille hele turen? Gennemførte stop slettes.")) return;
+  stopSpeech();
+  state.current=0; state.completed=[]; state.skipped=[]; state.arrivedNotified=[];
+  saveState(); renderAll();
+  toast("Turen er nulstillet – god tur!");
+}
+
+/* ============================================================
+   8) RENDERING AF BRUGERFLADEN
+   ============================================================ */
+function storyToParagraphs(txt){
+  return txt.split(/\n+/).map(p=>`<p>${p.trim()}</p>`).join("");
+}
+function mapsLinks(s){
+  // Apple Maps-link (omdirigerer selv til web/Google på andre platforme)
+  const apple=`https://maps.apple.com/?daddr=${s.lat},${s.lng}&dirflg=w`;
+  const google=`https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}&travelmode=walking`;
+  return `<div class="btn-row">
+    <button onclick="window.open('${apple}','_blank')">Åbn i Apple Maps</button>
+    <button onclick="window.open('${google}','_blank')">Åbn i Google Maps</button>
+  </div>`;
+}
+
+// Ét stort kort for det aktuelle stop
+function renderCurrentStop(){
+  const s=STOPS[state.current];
+  const done=isDone(s.id), arrived=state.arrivedNotified.includes(s.id);
+  const speaking=speakingStop===s.id;
+  const d=userPos?distMeters(userPos.lat,userPos.lng,s.lat,s.lng):null;
+
+  const badges=[
+    d!=null?`<span class="badge dist">${fmtDist(d)} herfra</span>`:"",
+    arrived&&!done?`<span class="badge arrived">Du er fremme</span>`:"",
+    done?`<span class="badge done">Gennemført</span>`:"",
+    isSkipped(s.id)?`<span class="badge skipped">Sprunget over</span>`:"",
+    speaking?`<span class="badge speaking">${isPaused?"⏸ Pause i oplæsning":"🔊 Læser op nu"}</span>`:""
+  ].join("");
+
+  document.getElementById("currentStopContainer").innerHTML=`
+  <div class="card">
+    <div class="stop-head">
+      <div class="stop-num ${done?"done":""}">${s.id+1}</div>
+      <h2 class="stop-title">${s.name}</h2>
+    </div>
+    <div class="badges">${badges}</div>
+    <p class="intro">${s.intro}</p>
+
+    <div class="btn-row">
+      <button class="btn-terra ${arrived&&!speaking&&!done?"pulse":""}" onclick="playStop(${s.id})">▶︎ Afspil fortælling</button>
+      <button onclick="pauseSpeech()" ${speaking?"":"disabled"}>${isPaused?"Fortsæt":"Pause"}</button>
+      <button onclick="stopSpeech()" ${speaking?"":"disabled"}>Stop</button>
+    </div>
+
+    <details class="story-box" ${speaking?"open":""}>
+      <summary>Læs fortællingen</summary>
+      <div class="story">${storyToParagraphs(s.story)}</div>
+    </details>
+
+    <div class="lookfor">
+      <h3>👀 Se efter dette</h3>
+      <ul>${s.lookFor.map(x=>`<li>${x}</li>`).join("")}</ul>
+    </div>
+
+    ${s.walkMin?`<p class="hint" style="margin-top:12px;">Gåtid til næste stop: ca. ${s.walkMin} min.</p>`:""}
+    ${mapsLinks(s)}
+
+    <div class="btn-row">
+      <button onclick="gotoStop(${s.id-1})" ${s.id===0?"disabled":""}>← Forrige</button>
+      <button onclick="gotoStop(${s.id+1})" ${s.id===STOPS.length-1?"disabled":""}>Næste stop →</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn-primary" onclick="markDone(${s.id})" ${done?"disabled":""}>✓ Markér som gennemført</button>
+      <button onclick="skipStop(${s.id})" ${done||isSkipped(s.id)?"disabled":""}>Vi springer dette stop over</button>
+    </div>
+  </div>`;
+}
+
+// Listen over alle stop
+function renderAllStops(){
+  const totalKm=3.5, totalMin=STOPS.reduce((a,s)=>a+s.walkMin,0);
+  document.getElementById("routeSummary").textContent=
+    `10 stop · ca. ${totalKm.toString().replace(".",",")} km · ca. ${totalMin} min ren gåtid (2–3 timer med stop).`;
+  document.getElementById("allStopsContainer").innerHTML=STOPS.map(s=>{
+    const d=userPos?fmtDist(distMeters(userPos.lat,userPos.lng,s.lat,s.lng)):null;
+    const status=isDone(s.id)?"✅":isSkipped(s.id)?"⏭":s.id===state.current?"📍":"○";
+    return `<button class="stop-row card" style="padding:14px;" onclick="openStopFromMap(${s.id})">
+      <div class="stop-num ${isDone(s.id)?"done":""}" style="width:38px;height:38px;font-size:1.05rem;">${s.id+1}</div>
+      <div class="grow">
+        <div class="name">${s.name}</div>
+        <div class="meta">${status} ${d?d+" herfra · ":""}${s.walkMin?`${s.walkMin} min til næste`:"Turen slutter her"}</div>
+      </div>
+      <div class="chev">›</div>
+    </button>`;
+  }).join("");
+}
+
+// Toptavle: fremdrift, aktuelt/næste stop og resterende afstand
+function renderHeader(){
+  const doneCount=state.completed.length;
+  const pct=Math.round(doneCount/STOPS.length*100);
+  document.getElementById("progressFill").style.width=pct+"%";
+  document.getElementById("hdrDone").textContent=`${doneCount} af ${STOPS.length} stop`;
+  document.getElementById("hdrPct").textContent=pct+" %";
+  const cur=STOPS[state.current];
+  document.getElementById("hdrCurrent").textContent="Nu: "+(cur?`${cur.id+1}. ${cur.name}`:"–");
+  const nxt=STOPS[state.current+1];
+  document.getElementById("hdrNext").textContent="Næste: "+(nxt?`${nxt.id+1}. ${nxt.name}`:"mål!");
+  // Estimeret resterende gåafstand: fugleflugt mellem resterende stop × 1,25
+  let rem=0;
+  for(let i=state.current;i<STOPS.length-1;i++){
+    rem+=distMeters(STOPS[i].lat,STOPS[i].lng,STOPS[i+1].lat,STOPS[i+1].lng);
+  }
+  document.getElementById("hdrRemaining").textContent="Ca. "+fmtDist(rem*1.25)+" tilbage";
+}
+
+// Afstandstekst øverst på kortet
+function updateDistances(){
+  const nxt=nextOpenStop();
+  const info=document.getElementById("mapInfo");
+  if(userPos&&nxt){
+    info.textContent=`Næste stop: ${nxt.id+1}. ${nxt.name} · ${fmtDist(distMeters(userPos.lat,userPos.lng,nxt.lat,nxt.lng))}`;
+  }else if(!nxt){
+    info.textContent="Alle stop er gennemført 🎉";
+  }
+  renderHeader();
+  // Opdater afstande i lister, hvis de er synlige
+  if(document.getElementById("view-all").classList.contains("active")) renderAllStops();
+  if(document.getElementById("view-current").classList.contains("active")) renderCurrentStop();
+}
+function renderAll(){
+  renderHeader(); renderCurrentStop(); renderAllStops(); refreshMarkers();
+}
+
+/* ============================================================
+   9) VISNINGSSKIFT (bundmenu)
+   ============================================================ */
+function showView(id){
+  document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id===id));
+  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===id));
+  if(id==="view-map"&&map){ setTimeout(()=>map.invalidateSize(),150); }
+}
+document.querySelectorAll("nav button").forEach(b=>{
+  b.addEventListener("click",()=>showView(b.dataset.view));
+});
+
+/* ============================================================
+   10) KOMPAS (valgfrit ekstra)
+   iPhone kræver eksplicit tilladelse via en knap.
+   ============================================================ */
+function handleOrientation(e){
+  let heading=null;
+  if(typeof e.webkitCompassHeading==="number"){ heading=e.webkitCompassHeading; } // iOS
+  else if(typeof e.alpha==="number"){ heading=360-e.alpha; }                      // andre
+  if(heading==null) return;
+  const c=document.getElementById("compass");
+  c.style.display="flex";
+  document.getElementById("compassNeedle").style.transform=`rotate(${-heading}deg)`;
+}
+document.getElementById("btnCompassPerm").addEventListener("click",async()=>{
+  try{
+    if(typeof DeviceOrientationEvent!=="undefined" &&
+       typeof DeviceOrientationEvent.requestPermission==="function"){
+      const res=await DeviceOrientationEvent.requestPermission();
+      if(res!=="granted"){ toast("Kompas-tilladelse blev afvist."); return; }
+    }
+    window.addEventListener("deviceorientation",handleOrientation);
+    toast("Kompas aktiveret – se øverst til højre på kortet.");
+    showView("view-map");
+  }catch(e){ toast("Kompas er ikke tilgængeligt på denne enhed."); }
+});
+
+/* ============================================================
+   11) KORTKNAPPER OG INDSTILLINGER
+   ============================================================ */
+document.getElementById("btnMyPos").addEventListener("click",()=>{
+  if(map&&userPos){ map.setView([userPos.lat,userPos.lng],17); }
+  else{ toast("Din position er ikke fundet endnu. Tjek at placering er tilladt."); }
+});
+document.getElementById("btnNextStop").addEventListener("click",()=>{
+  const nxt=nextOpenStop();
+  if(map&&nxt){ map.setView([nxt.lat,nxt.lng],17); stopMarkers[nxt.id].openPopup(); }
+  else if(!nxt){ toast("Alle stop er gennemført!"); }
+});
+document.getElementById("btnReset").addEventListener("click",resetTour);
+
+const rateEl=document.getElementById("rate"), volEl=document.getElementById("volume");
+rateEl.addEventListener("input",()=>{
+  state.rate=parseFloat(rateEl.value); saveState();
+  document.getElementById("rateVal").textContent=state.rate.toFixed(1).replace(".",",")+"×";
+});
+volEl.addEventListener("input",()=>{
+  state.volume=parseFloat(volEl.value); saveState();
+  document.getElementById("volVal").textContent=Math.round(state.volume*100)+" %";
+});
+
+/* ============================================================
+   12) OPSTART
+   ============================================================ */
+loadState();
+rateEl.value=state.rate; volEl.value=state.volume;
+document.getElementById("rateVal").textContent=state.rate.toFixed(1).replace(".",",")+"×";
+document.getElementById("volVal").textContent=Math.round(state.volume*100)+" %";
+initMap();
+startGeolocation();
+pickVoice();
+renderAll();
+</script>
+</body>
+</html>
