@@ -313,6 +313,8 @@ nav button.active{color:var(--sea);}
       <strong id="aboutTitle"></strong>
       <p class="hint" id="aboutText" style="margin:8px 0 0;"></p>
     </div>
+
+    <button class="btn-ghost" id="btnResetApp" style="width:100%; color:var(--terra);"></button>
   </div>
 </section>
 
@@ -363,6 +365,8 @@ da:{
   doneToast:"Godt gået! Næste stop: {name}", allDoneToast:"🎉 Hele turen er gennemført – tillykke!",
   skipToast:"Stoppet er sprunget over – det kan altid genåbnes fra listen.",
   tourSwitched:"Byen er skiftet til {name}.",
+  resetApp:"Nulstil hele appen",
+  resetAppConfirm:"Vil du nulstille hele appen? Alt slettes: byvalg, sprog og fremdrift i begge byer. Hentede offline-kort bevares.",
   noSpeech:"Oplæsning understøttes ikke – læs teksten i stedet.",
   noSpeechSetting:"Oplæsning understøttes ikke i denne browser. Du kan stadig læse alle fortællinger selv.",
   voiceFound:"Stemme: {name}. ",
@@ -415,6 +419,8 @@ en:{
   doneToast:"Well done! Next stop: {name}", allDoneToast:"🎉 Tour complete – congratulations!",
   skipToast:"Stop skipped – you can always reopen it from the list.",
   tourSwitched:"City switched to {name}.",
+  resetApp:"Reset the entire app",
+  resetAppConfirm:"Reset the entire app? Everything is cleared: city choice, language and progress in both cities. Downloaded offline maps are kept.",
   noSpeech:"Narration isn't supported – please read the text instead.",
   noSpeechSetting:"Narration isn't supported in this browser. You can still read all the stories yourself.",
   voiceFound:"Voice: {name}. ",
@@ -1130,6 +1136,7 @@ function applyLanguage(){
   set("lblRate","lblRate"); set("lblVolume","lblVolume"); set("lblVoice","lblVoice");
   set("lblGps","lblGps"); set("btnCompassPerm","btnCompass"); set("compassHint","compassHint");
   set("lblOffline","lblOffline"); set("btnOffline","btnOffline");
+  set("btnResetApp","resetApp");
   document.getElementById("aboutTitle").textContent=t("aboutTitle");
   document.getElementById("aboutText").textContent=L8(tour.about);
   document.getElementById("gpsNote").innerHTML=t("gpsNote");
@@ -1176,6 +1183,13 @@ function resetTour(){
   stopSpeech();
   state.tours[state.tour]=defaultProg();
   saveState(); renderAll(); toast(t("resetDone"));
+}
+// Fuld nulstilling: sletter alt gemt og genstarter appen med byvælgeren
+function resetApp(){
+  if(!confirm(t("resetAppConfirm"))) return;
+  stopSpeech();
+  try{ localStorage.removeItem(LS_KEY); localStorage.removeItem(LS_KEY_OLD); }catch(e){}
+  location.reload();
 }
 
 /* ============================================================
@@ -1363,6 +1377,7 @@ document.getElementById("btnNextStop").addEventListener("click",()=>{
   else if(!nxt){ toast(t("allDoneInfo")); }
 });
 document.getElementById("btnReset").addEventListener("click",resetTour);
+document.getElementById("btnResetApp").addEventListener("click",resetApp);
 
 const rateEl=document.getElementById("rate"), volEl=document.getElementById("volume");
 rateEl.addEventListener("input",()=>{
