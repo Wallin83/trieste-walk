@@ -325,7 +325,7 @@ da:{
   prev:"← Forrige", nextBtn:"Næste stop →",
   markDone:"✓ Markér som gennemført", skip:"Vi springer dette stop over",
   fromHere:"{d} herfra", arrived:"Du er fremme", completed:"Gennemført", skipped:"Sprunget over",
-  playingNow:"🔊 Læser op nu", pausedBadge:"⏸ Pause i oplæsning",
+  playingNow:"🔊 Læser op nu", pausedBadge:"⏸ Pause i oplæsning", seekStart:"Start", seekEnd:"Slut",
   arrivedToast:"Du er fremme ved stop {n}: {name} 🎧",
   doneToast:"Godt gået! Næste stop: {name}", allDoneToast:"🎉 Hele turen er gennemført – tillykke!",
   skipToast:"Stoppet er sprunget over – det kan altid genåbnes fra listen.",
@@ -372,7 +372,7 @@ en:{
   prev:"← Previous", nextBtn:"Next stop →",
   markDone:"✓ Mark as completed", skip:"We'll skip this stop",
   fromHere:"{d} from here", arrived:"You've arrived", completed:"Completed", skipped:"Skipped",
-  playingNow:"🔊 Playing now", pausedBadge:"⏸ Narration paused",
+  playingNow:"🔊 Playing now", pausedBadge:"⏸ Narration paused", seekStart:"Start", seekEnd:"End",
   arrivedToast:"You've arrived at stop {n}: {name} 🎧",
   doneToast:"Well done! Next stop: {name}", allDoneToast:"🎉 Tour complete – congratulations!",
   skipToast:"Stop skipped – you can always reopen it from the list.",
@@ -724,6 +724,8 @@ function checkProximity(){
    ============================================================ */
 let activeVoice=null, speakingStop=null, isPaused=false;
 let speechQueue=[], speechIdx=0, gapTimer=null, inGap=false;
+let speechGen=0;                 // generationstæller: gør spoling/stop immun over for forsinkede onend-events
+let storyOpen=false, lastStoryStop=-1, seekDragging=false;
 
 function pickVoice(){
   if(!("speechSynthesis" in window)){
@@ -756,6 +758,7 @@ function speakNext(){
     speakingStop=null; inGap=false; renderAll(); return;
   }
   inGap=false;
+  const gen=speechGen;             // hører denne sætning stadig til den aktive afspilning?
   const item=speechQueue[speechIdx++];
   const u=new SpeechSynthesisUtterance(item.text);
   u.lang=state.lang==="da"?"da-DK":"en-GB";
@@ -763,24 +766,26 @@ function speakNext(){
   u.rate=state.rate; u.volume=state.volume;
   let finished=false;
   const finish=()=>{
-    if(finished||speakingStop===null||isPaused) return;
+    if(finished||gen!==speechGen||speakingStop===null||isPaused) return;
     finished=true; inGap=true;
-    gapTimer=setTimeout(()=>{ if(!isPaused) speakNext(); }, item.gap/state.rate);
+    gapTimer=setTimeout(()=>{ if(gen===speechGen&&!isPaused) speakNext(); }, item.gap/state.rate);
   };
   u.onend=finish; u.onerror=finish;
   speechSynthesis.speak(u);
+  updateSeekUI();
 }
 function playStop(id){
   if(!("speechSynthesis" in window)){ toast(t("noSpeech")); return; }
   stopSpeech();
   speakingStop=id; isPaused=false; speechIdx=0;
+  storyOpen=true;                 // vis teksten, så man kan læse med
   speechQueue=buildSpeechQueue(L8(STOPS[id].story));
   speakNext(); renderAll();
 }
 function pauseSpeech(){
   if(!("speechSynthesis" in window)||speakingStop===null) return;
   if(!isPaused){
-    isPaused=true;
+    isPaused=true; speechGen++;
     clearTimeout(gapTimer);
     if(!inGap&&speechIdx>0) speechIdx--;   // genoptag fra den afbrudte sætning
     try{ speechSynthesis.cancel(); }catch(e){}
@@ -790,10 +795,36 @@ function pauseSpeech(){
   renderAll();
 }
 function stopSpeech(){
+  speechGen++;
   clearTimeout(gapTimer);
   if("speechSynthesis" in window){ try{ speechSynthesis.cancel(); }catch(e){} }
   speakingStop=null; isPaused=false; inGap=false; speechQueue=[]; speechIdx=0;
   renderAll();
+}
+
+/* --- Afspilningslinje: spol til en vilkårlig sætning i fortællingen --- */
+function updateSeekUI(){
+  if(seekDragging) return;
+  const sEl=document.getElementById("seek");
+  if(!sEl) return;
+  sEl.max=Math.max(0,speechQueue.length-1);
+  sEl.value=Math.max(0,speechIdx-1);
+  const pEl=document.getElementById("seekPct");
+  if(pEl) pEl.textContent=Math.round(speechIdx/Math.max(1,speechQueue.length)*100)+" %";
+}
+function seekPreview(v){            // mens man trækker: vis kun procenten
+  seekDragging=true;
+  const pEl=document.getElementById("seekPct");
+  if(pEl) pEl.textContent=Math.round((parseInt(v,10)+1)/Math.max(1,speechQueue.length)*100)+" %";
+}
+function seekTo(v){                 // når man slipper: hop til sætningen
+  seekDragging=false;
+  if(speakingStop===null) return;
+  speechGen++;                      // gør evt. hængende onend-events ugyldige
+  clearTimeout(gapTimer); inGap=false;
+  try{ speechSynthesis.cancel(); }catch(e){}
+  speechIdx=Math.max(0,Math.min(speechQueue.length-1,parseInt(v,10)||0));
+  if(!isPaused) speakNext(); else updateSeekUI();
 }
 
 /* ============================================================
@@ -871,6 +902,7 @@ function mapsLinks(s){
 }
 function renderCurrentStop(){
   const s=STOPS[state.current];
+  if(lastStoryStop!==s.id){ storyOpen=false; lastStoryStop=s.id; } // nyt stop → luk tekstpanelet
   const done=isDone(s.id), arrived=state.arrivedNotified.includes(s.id);
   const speaking=speakingStop===s.id;
   const d=userPos?distMeters(userPos.lat,userPos.lng,s.lat,s.lng):null;
@@ -881,6 +913,19 @@ function renderCurrentStop(){
     isSkipped(s.id)?`<span class="badge skipped">${t("skipped")}</span>`:"",
     speaking?`<span class="badge speaking">${isPaused?t("pausedBadge"):t("playingNow")}</span>`:""
   ].join("");
+
+  // Afspilningslinje vises, når dette stops fortælling er i gang eller på pause
+  const seekBar=speaking?`
+    <div style="margin-top:10px;">
+      <input type="range" id="seek" min="0" max="${Math.max(0,speechQueue.length-1)}"
+        value="${Math.max(0,speechIdx-1)}"
+        oninput="seekPreview(this.value)" onchange="seekTo(this.value)">
+      <div class="hint" style="display:flex; justify-content:space-between; margin-top:0;">
+        <span>${t("seekStart")}</span>
+        <span id="seekPct">${Math.round(speechIdx/Math.max(1,speechQueue.length)*100)} %</span>
+        <span>${t("seekEnd")}</span>
+      </div>
+    </div>`:"";
 
   document.getElementById("currentStopContainer").innerHTML=`
   <div class="card">
@@ -896,8 +941,9 @@ function renderCurrentStop(){
       <button onclick="pauseSpeech()" ${speaking?"":"disabled"}>${isPaused?t("resume"):t("pause")}</button>
       <button onclick="stopSpeech()" ${speaking?"":"disabled"}>${t("stop")}</button>
     </div>
+    ${seekBar}
 
-    <details class="story-box" ${speaking?"open":""}>
+    <details class="story-box" id="storyBox" ${storyOpen?"open":""}>
       <summary>${t("readStory")}</summary>
       <div class="story">${storyToParagraphs(L8(s.story))}</div>
     </details>
@@ -919,6 +965,9 @@ function renderCurrentStop(){
       <button onclick="skipStop(${s.id})" ${done||isSkipped(s.id)?"disabled":""}>${t("skip")}</button>
     </div>
   </div>`;
+  // Husk om tekstpanelet er åbent, så GPS-opdateringer ikke lukker det
+  const box=document.getElementById("storyBox");
+  if(box) box.addEventListener("toggle",()=>{ storyOpen=box.open; });
 }
 function renderAllStops(){
   document.getElementById("routeSummary").textContent=t("routeSummary");
@@ -961,7 +1010,7 @@ function updateDistances(){
   else if(!userPos){ info.textContent=t("waitingGps"); }
   renderHeader();
   if(document.getElementById("view-all").classList.contains("active")) renderAllStops();
-  if(document.getElementById("view-current").classList.contains("active")) renderCurrentStop();
+  if(document.getElementById("view-current").classList.contains("active") && !seekDragging) renderCurrentStop();
 }
 function renderAll(){ renderHeader(); renderCurrentStop(); renderAllStops(); refreshMarkers(); }
 
