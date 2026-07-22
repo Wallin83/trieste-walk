@@ -669,6 +669,7 @@ function checkProximity(){
    afspilningen mere stabil på mobil. Kun ét stop ad gangen.
    ============================================================ */
 let danishVoice=null, speakingStop=null, isPaused=false;
+let speechQueue=[], speechIdx=0, gapTimer=null, inGap=false;
 
 function pickVoice(){
   if(!("speechSynthesis" in window)){
@@ -676,45 +677,80 @@ function pickVoice(){
     return;
   }
   const voices=speechSynthesis.getVoices();
-  danishVoice=voices.find(v=>v.lang && v.lang.toLowerCase().startsWith("da"))||null;
+  const da=voices.filter(v=>v.lang && v.lang.toLowerCase().startsWith("da"));
+  // Foretræk forbedrede stemmer – de lyder markant mere naturlige end kompakt-stemmen
+  danishVoice=da.find(v=>/enhanced|premium|forbedret|natural|siri/i.test(v.name)) || da[0] || null;
   const info=document.getElementById("voiceInfo");
+  const tip="Tip: Hent en forbedret dansk stemme på iPhonen under Indstillinger → Tilgængelighed → Oplæst indhold → Stemmer → Dansk (fx “Sara (Forbedret)”). Guiden bruger den automatisk, og oplæsningen bliver langt mere naturlig.";
   if(danishVoice){
-    info.textContent=`Dansk stemme fundet: ${danishVoice.name}.`;
+    const isEnhanced=/enhanced|premium|forbedret|natural|siri/i.test(danishVoice.name);
+    info.textContent=`Dansk stemme: ${danishVoice.name}. `+(isEnhanced?"":tip);
   }else if(voices.length){
-    info.textContent="Ingen dansk stemme fundet – standardstemmen bruges. Tilføj evt. en dansk Siri-stemme under Indstillinger → Tilgængelighed → Oplæst indhold.";
+    info.textContent="Ingen dansk stemme fundet – standardstemmen bruges. "+tip;
   }
 }
 if("speechSynthesis" in window){
   speechSynthesis.onvoiceschanged=pickVoice;
 }
 
+// Byg en kø af sætninger med naturlige pauser:
+// kort pause mellem sætninger, længere "vejrtrækning" mellem afsnit.
+function buildSpeechQueue(story){
+  const q=[];
+  story.split(/\n+/).forEach(par=>{
+    const parts=(par.match(/[^.!?]+[.!?]+\s*|[^.!?]+$/g)||[par])
+      .map(p=>p.trim()).filter(p=>p.length);
+    parts.forEach((p,i)=>q.push({text:p, gap: i===parts.length-1 ? 750 : 260}));
+  });
+  return q;
+}
+// Afspil én sætning ad gangen og hold pause imellem – det lyder
+// langt mere naturligt end at læse hele teksten i ét stræk.
+function speakNext(){
+  if(speakingStop===null || speechIdx>=speechQueue.length){
+    speakingStop=null; inGap=false; renderAll(); return;
+  }
+  inGap=false;
+  const item=speechQueue[speechIdx++];
+  const u=new SpeechSynthesisUtterance(item.text);
+  u.lang="da-DK";
+  if(danishVoice) u.voice=danishVoice;
+  u.rate=state.rate; u.volume=state.volume;
+  let finished=false;
+  const finish=()=>{
+    if(finished || speakingStop===null) return;
+    finished=true; inGap=true;
+    // Pausen skaleres med talehastigheden
+    gapTimer=setTimeout(()=>{ if(!isPaused) speakNext(); }, item.gap/state.rate);
+  };
+  u.onend=finish; u.onerror=finish;
+  speechSynthesis.speak(u);
+}
 function playStop(id){
   if(!("speechSynthesis" in window)){ toast("Oplæsning understøttes ikke – læs teksten i stedet."); return; }
   stopSpeech();                       // stop evt. anden fortælling først
-  const s=STOPS[id];
-  speakingStop=id; isPaused=false;
-  // Del teksten i sætninger og læg dem i kø (uden lookbehind af hensyn til ældre Safari)
-  const parts=(s.story.match(/[^.!?]+[.!?]+\s*|[^.!?]+$/g)||[s.story])
-    .map(p=>p.trim()).filter(p=>p.length);
-  parts.forEach((p,i)=>{
-    const u=new SpeechSynthesisUtterance(p);
-    u.lang="da-DK";
-    if(danishVoice) u.voice=danishVoice;
-    u.rate=state.rate; u.volume=state.volume;
-    if(i===parts.length-1){ u.onend=()=>{ if(speakingStop===id){ speakingStop=null; renderAll(); } }; }
-    speechSynthesis.speak(u);
-  });
+  speakingStop=id; isPaused=false; speechIdx=0;
+  speechQueue=buildSpeechQueue(STOPS[id].story);
+  speakNext();
   renderAll();
 }
 function pauseSpeech(){
   if(!("speechSynthesis" in window)||speakingStop===null) return;
-  if(!isPaused){ speechSynthesis.pause(); isPaused=true; }
-  else{ speechSynthesis.resume(); isPaused=false; }
+  if(!isPaused){
+    isPaused=true;
+    if(inGap){ clearTimeout(gapTimer); }          // pause ramt mellem to sætninger
+    else{ try{ speechSynthesis.pause(); }catch(e){} }
+  }else{
+    isPaused=false;
+    if(speechSynthesis.paused){ try{ speechSynthesis.resume(); }catch(e){} }
+    else{ speakNext(); }                           // vi holdt pause i et mellemrum
+  }
   renderAll();
 }
 function stopSpeech(){
+  clearTimeout(gapTimer);
   if("speechSynthesis" in window){ try{ speechSynthesis.cancel(); }catch(e){} }
-  speakingStop=null; isPaused=false;
+  speakingStop=null; isPaused=false; inGap=false; speechQueue=[]; speechIdx=0;
   renderAll();
 }
 
