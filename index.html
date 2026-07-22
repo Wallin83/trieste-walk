@@ -208,6 +208,11 @@ nav button.active{color:var(--sea);}
     <span><span class="tname">Rhodos · Rhodes</span><br>
     <span class="tmeta">10 stop · ca. 2,5 km · 2–3 timer / hours</span></span>
   </button>
+  <button class="card tour-card" onclick="chooseTour('koege')">
+    <span class="flag">🇩🇰</span>
+    <span><span class="tname">Køge</span><br>
+    <span class="tmeta">8 stop · ca. 2 km · 1,5–2,5 timer / hours</span></span>
+  </button>
   <p class="hint">Valget huskes – det kan altid ændres under Indstillinger.<br>
   Your choice is remembered – change it anytime in Settings.</p>
 </div>
@@ -266,6 +271,7 @@ nav button.active{color:var(--sea);}
         <div class="seg">
           <button id="tourTrieste" onclick="setTour('trieste')">🇮🇹 Trieste</button>
           <button id="tourRhodos" onclick="setTour('rhodos')">🇬🇷 Rhodos</button>
+          <button id="tourKoege" onclick="setTour('koege')">🇩🇰 Køge</button>
         </div>
       </div>
       <div class="setting" style="margin-bottom:6px;">
@@ -350,7 +356,7 @@ da:{
   lblOffline:"Offline", btnOffline:"Hent kort til offline-brug", btnOfflineBusy:"Henter … {p} %",
   offlineHint:"Henter ca. 5 MB kortudsnit for den valgte bys rute. Fortællinger og GPS virker allerede uden internet – oplæsning kræver blot en hentet stemme på telefonen. Appen og turene opdaterer sig selv automatisk, når der er internet.",
   btnRefreshTiles:"Forny offline-kort (hent forfra)",
-  refreshTilesConfirm:"Sletter alle gemte kortfliser (begge byer) og henter kortet for den valgte by forfra. Fortsæt?",
+  refreshTilesConfirm:"Sletter alle gemte kortfliser (alle byer) og henter kortet for den valgte by forfra. Fortsæt?",
   offlineDone:"Offline-kort er hentet ✓ Appen virker nu uden internet.",
   offlineFail:"Nogle kortfliser kunne ikke hentes – prøv igen på wi-fi.",
   offlineNoSw:"Offline kræver HTTPS – det virker på jeres webadresse, men ikke fra en lokal fil.",
@@ -369,7 +375,7 @@ da:{
   skipToast:"Stoppet er sprunget over – det kan altid genåbnes fra listen.",
   tourSwitched:"Byen er skiftet til {name}.",
   resetApp:"Nulstil hele appen",
-  resetAppConfirm:"Vil du nulstille hele appen? Alt slettes: byvalg, sprog og fremdrift i begge byer. Hentede offline-kort bevares.",
+  resetAppConfirm:"Vil du nulstille hele appen? Alt slettes: byvalg, sprog og fremdrift i alle byer. Hentede offline-kort bevares.",
   noSpeech:"Oplæsning understøttes ikke – læs teksten i stedet.",
   noSpeechSetting:"Oplæsning understøttes ikke i denne browser. Du kan stadig læse alle fortællinger selv.",
   voiceFound:"Stemme: {name}. ",
@@ -406,7 +412,7 @@ en:{
   lblOffline:"Offline", btnOffline:"Download maps for offline use", btnOfflineBusy:"Downloading … {p} %",
   offlineHint:"Downloads ~5 MB of map tiles for the selected city's route. Stories and GPS already work without internet – narration just requires a downloaded voice on the phone. The app and tours update automatically whenever you're online.",
   btnRefreshTiles:"Refresh offline maps (re-download)",
-  refreshTilesConfirm:"Deletes all stored map tiles (both cities) and re-downloads the map for the selected city. Continue?",
+  refreshTilesConfirm:"Deletes all stored map tiles (all cities) and re-downloads the map for the selected city. Continue?",
   offlineDone:"Offline maps downloaded ✓ The app now works without internet.",
   offlineFail:"Some map tiles failed to download – try again on wi-fi.",
   offlineNoSw:"Offline requires HTTPS – it works on your web address, but not from a local file.",
@@ -425,7 +431,7 @@ en:{
   skipToast:"Stop skipped – you can always reopen it from the list.",
   tourSwitched:"City switched to {name}.",
   resetApp:"Reset the entire app",
-  resetAppConfirm:"Reset the entire app? Everything is cleared: city choice, language and progress in both cities. Downloaded offline maps are kept.",
+  resetAppConfirm:"Reset the entire app? Everything is cleared: city choice, language and progress in all cities. Downloaded offline maps are kept.",
   noSpeech:"Narration isn't supported – please read the text instead.",
   noSpeechSetting:"Narration isn't supported in this browser. You can still read all the stories yourself.",
   voiceFound:"Voice: {name}. ",
@@ -831,7 +837,138 @@ The final question of the walk: which stop was your favourite? And if you could 
 One last tip: if you still have energy, take a walk down in the old moat around the town wall. It's dry, and today it's a green park – and from down there, the walls look their most impressive. Otherwise, it's time for your well-earned reward: an ice cream or a cold drink with a view of the harbour.
 Thank you for walking along! Rhodes says goodbye in Greek: "Yassas!" – and give one last wave towards the deer by the harbour, right where the sun god once stood shining over it all.`}
   }
+]},
+
+/* ------------------------- KØGE ------------------------- */
+koege:{
+  title:{da:"Køge City Walk", en:"Køge City Walk"},
+  cityName:{da:"Køge", en:"Køge"},
+  center:[55.4561,12.1810], zoom:16,
+  summary:{da:"8 stop · ca. 2 km · ca. 25 min ren gåtid (1,5–2,5 timer med stop).",
+           en:"8 stops · approx. 2 km · about 25 min of pure walking (1.5–2.5 hours with stops)."},
+  about:{da:"Ca. 2 km til fods gennem Køges middelalderlige bykerne – en af de bedst bevarede i Danmark. Regn med 1,5–2,5 timer med stop. Turen starter og slutter på Torvet. God tur!",
+         en:"Approx. 2 km on foot through Køge's medieval old town – one of the best-preserved in Denmark. Allow 1.5–2.5 hours with stops. The tour starts and ends at Torvet. Enjoy!"},
+  stops:[
+  { id:0, lat:55.45611, lng:12.17972, walkMin:3,
+    name:{da:"Torvet", en:"Torvet (the Market Square)"},
+    intro:{da:"Danmarks største middelalderlige torv – og udgangspunkt for hele turen.",
+           en:"Denmark's largest medieval market square – and the starting point for the whole walk."},
+    lookFor:{da:["Statuen af Frederik VII midt på pladsen","De brede brostensflader – tænk på alle de heste og vogne, der har kørt her","Facaderne rundt om pladsen – bindingsværk blandet med nyere huse"],
+             en:["The statue of Frederik VII in the middle of the square","The wide cobblestones – imagine all the horses and carts that have rolled across them","The façades around the square – half-timbering mixed with newer buildings"]},
+    story:{da:`Velkommen til Køge – og til jeres helt egen byvandring gennem en af Danmarks bedst bevarede middelalderbyer! Vi står på Torvet, som faktisk er det største middelalderlige torv i hele landet. Køge fik sine købstadsrettigheder helt tilbage i 1288, og i mere end 700 år har handelsfolk, fiskere og håndværkere mødtes lige her, hvor I står nu.
+Midt på pladsen ser I en statue af Frederik VII. Han var med til at give Danmark sin første grundlov i 1849 – og han besøgte faktisk Køge selv.
+Inden vi går videre, skal I lære en leg, som vi bruger hele turen: Køges gamle huse er fulde af udskårne trædetaljer – især små, buede træstykker under overetagen, som kaldes knægte. De holdt huset oppe og var samtidig pynt. Se, om I kan få øje på den første undervejs til næste stop – vi tæller dem hele vejen rundt!
+Er I klar? Så går vi op mod kirken, som troner lige nord for pladsen.`,
+    en:`Welcome to Køge – and to your very own city walk through one of Denmark's best-preserved medieval towns! We're standing on Torvet, which is actually the largest medieval market square in the whole country. Køge received its market town charter all the way back in 1288, and for more than 700 years, merchants, fishermen and craftsmen have met right here, where you're standing now.
+In the middle of the square stands a statue of Frederik VII. He helped give Denmark its first constitution in 1849 – and he actually visited Køge himself.
+Before we move on, let's learn a game we'll play the whole walk: Køge's old houses are full of carved wooden details – especially small, curved wooden brackets under the upper floor, called knægte. They held the house up and served as decoration at the same time. See if you can spot the first one on the way to the next stop – we'll be counting them all the way around!
+Ready? Then let's head up towards the church, which stands just north of the square.`}
+  },
+  { id:1, lat:55.45831, lng:12.18281, walkMin:2,
+    name:{da:"Køge Kirke (Sankt Nicolai)", en:"Køge Church (St. Nicolai)"},
+    intro:{da:"Byens store kirke, viet til de søfarendes skytshelgen.",
+           en:"The town's great church, dedicated to the patron saint of sailors."},
+    lookFor:{da:["Det høje tårn – har I talt etagerne?","De to gavle, der vender ud mod hver sin gade","Klokkerne – lyt efter, om de ringer, mens I er der"],
+             en:["The tall tower – have you counted the storeys?","The two gables, each facing a different street","The bells – listen for whether they're ringing while you're there"]},
+    story:{da:`Foran jer troner Sankt Nicolai Kirke, som de fleste bare kalder Køge Kirke. Den er opkaldt efter Sankt Nikolaus, som er skytshelgen for søfolk – meget passende for en by, der altid har levet af havet og handlen.
+Kirken er ikke bygget på én gang. De ældste murrester stammer helt fra omkring år 1300, mens det flotte tårn kom til lidt senere. Med sine over 40 meter er tårnet stadig et af de højeste punkter i byen, og i mange hundrede år har det vist skibene vej ind til havnen.
+Kirken ligger klemt inde mellem to gader: Kirkestræde mod vest og Nørregade mod øst. Sådan var det ofte i middelalderen – kirken var byens centrum, og gaderne krøb tæt op ad den.
+Kan I se nogen knægte på husene her omkring? Husk at tælle med! Nu går vi om på den anden side af kirken, ind i en af Danmarks mest fotograferede gader.`,
+    en:`Ahead of you stands Sankt Nicolai Church, which most people simply call Køge Church. It's named after Saint Nicholas, the patron saint of sailors – very fitting for a town that has always lived off the sea and trade.
+The church wasn't built all at once. The oldest remaining walls date back to around the year 1300, while the impressive tower was added a little later. At over 40 metres, the tower is still one of the highest points in town, and for hundreds of years it has guided ships into the harbour.
+The church is squeezed between two streets: Kirkestræde to the west and Nørregade to the east. That was often how it was in the Middle Ages – the church was the centre of town, and the streets crowded close up against it.
+Can you spot any knægte on the houses around here? Remember to keep counting! Now let's walk around to the other side of the church, into one of Denmark's most photographed streets.`}
+  },
+  { id:2, lat:55.45770, lng:12.18110, walkMin:2,
+    name:{da:"Kirkestræde", en:"Kirkestræde"},
+    intro:{da:"En af Danmarks mest fotograferede gader, fyldt med bindingsværk.",
+           en:"One of Denmark's most photographed streets, full of half-timbering."},
+    lookFor:{da:["De skæve, hældende husfacader","De brede dørtrin – slidt af hundredvis af års fødder","Farverne på bindingsværket – ingen huse er ens"],
+             en:["The crooked, leaning house façades","The wide doorsteps – worn down by hundreds of years of footsteps","The colours of the half-timbering – no two houses are alike"]},
+    story:{da:`Nu står I i Kirkestræde, en lille buet gade, der løber langs kirkens vestside. Den er en af de mest fotograferede gader i hele Danmark, og det er der en god grund til: husene her hælder, vipper og læner sig ind mod hinanden, som om de har stået og sludret i århundreder.
+Mange af husene er over 400 år gamle, og de blev bygget tæt, fordi plads inden for byens volde var dyrebar. Se, om I kan finde et hus, der hælder særlig meget – de gamle bindingsværkshuse har sjældent en lige linje tilbage.
+Og nu til noget særligt: et af husene her i gaden gemmer på en rekord for hele Danmark. Det finder vi om lidt. Men først: hvor mange knægte har I talt indtil videre?`,
+    en:`Now you're standing in Kirkestræde, a small curved street running along the west side of the church. It's one of the most photographed streets in all of Denmark, and there's good reason for that: the houses here lean, tilt and huddle towards each other, as if they've been standing and chatting for centuries.
+Many of the houses are over 400 years old, and they were built close together because space inside the town's ramparts was precious. See if you can find a house that leans especially much – the old timber-framed houses rarely have a straight line left.
+And now for something special: one of the houses on this street holds a record for the whole of Denmark. We'll find it in a moment. But first: how many knægte have you counted so far?`}
+  },
+  { id:3, lat:55.45790, lng:12.18075, walkMin:1,
+    name:{da:"Det Gamle Hus", en:"The Old House"},
+    intro:{da:"Danmarks ældste daterede bindingsværkshus – bygget i 1527.",
+           en:"Denmark's oldest dated half-timbered house – built in 1527."},
+    lookFor:{da:["Indskriften over døren","Det lille, lave hus – meget mindre end sine naboer","Vinduerne – forestil jer, hvor mørkt der må have været indenfor"],
+             en:["The inscription above the door","The small, low house – much smaller than its neighbours","The windows – imagine how dark it must have been inside"]},
+    story:{da:`Her er den! Det lille hus foran jer, Kirkestræde 20, er Danmarks ældste daterede bindingsværkshus. Det blev bygget helt tilbage i 1527 – dengang Christian den 2. lige var blevet jaget væk som konge.
+I mange hundrede år vidste ingen præcis, hvor gammelt huset var. Men i 1888, da man skrabede kalk af facaden, dukkede der en gammel trædørhammer frem med en indskrift, der fortalte, hvornår huset var bygget. Forestil jer at skrabe 14 lag maling og kalk væk og pludselig finde en besked fra nogen, der levede for næsten 500 år siden!
+Huset er faktisk et af de mindste i gaden – det var oprindeligt beregnet til udlejning til folk, der ikke havde så mange penge. Alligevel har det overlevet, mens meget større og flottere huse er forsvundet.
+I dag bruges huset som en del af børnebiblioteket. Kig godt efter knægtene her – der plejer at være nogle stykker at tælle med.`,
+    en:`Here it is! The small house in front of you, Kirkestræde 20, is Denmark's oldest dated half-timbered house. It was built all the way back in 1527 – around the time King Christian II had just been forced from the throne.
+For hundreds of years, nobody knew exactly how old the house was. But in 1888, while scraping plaster off the façade, an old wooden door lintel appeared with an inscription revealing when the house was built. Imagine scraping away 14 layers of paint and plaster and suddenly finding a message from someone who lived almost 500 years ago!
+The house is actually one of the smallest on the street – it was originally built as rental housing for people who didn't have much money. And yet it has survived, while much bigger and grander houses have disappeared.
+Today the house is part of the children's library. Look closely for knægte here – there are usually a few to add to your count.`}
+  },
+  { id:4, lat:55.45500, lng:12.18100, walkMin:4,
+    name:{da:"Brogade 16", en:"Brogade 16"},
+    intro:{da:"En flot dobbeltgård fra 1636, bygget af en tidligere borgmester.",
+           en:"A handsome double courtyard house from 1636, built by a former mayor."},
+    lookFor:{da:["Porten med de udskårne bogstaver over sig","Det svære egetømmer i bindingsværket","Gårdrummet bagved, hvis porten står åben"],
+             en:["The gateway with carved letters above it","The heavy oak timber in the frame","The courtyard behind it, if the gate is open"]},
+    story:{da:`Vi går nu ned ad Brogade, en af de gamle handelsgader, der fører ned mod havnen. Foran jer ligger nummer 16 – en stor, smuk dobbeltgård fra 1636.
+Huset blev bygget af Hans Christensen Humble, som på det tidspunkt var borgmester i Køge. Sjovt nok boede han slet ikke selv her – han byggede huset for at sælge det, lidt ligesom et moderne byggeprojekt. Baggrunden var en stor brand i 1633, der ødelagde store dele af Brogade. Da Humble havde købt to nabogrunde efter branden, byggede han én stor, flot gård i stedet for to mindre.
+Kig op over porten: der sidder en lille udskåret trædetalje med bogstaverne HCKHD – det står for Hans Christensen og hans kone, Karen Hans Datter. Sådan markerede man ofte, hvem der havde bygget et hus.
+Bindingsværket her er lavet af svært egetømmer og har klaret sig flot i snart 400 år. Endnu et sted at lede efter knægte, inden vi går videre til et af byens hyggeligste steder – under jorden!`,
+    en:`We're now walking down Brogade, one of the old trading streets leading down towards the harbour. In front of you is number 16 – a large, handsome double courtyard house from 1636.
+The house was built by Hans Christensen Humble, who was the mayor of Køge at the time. Funnily enough, he never actually lived here himself – he built the house to sell it, a bit like a modern property development. The background was a major fire in 1633 that destroyed large parts of Brogade. Once Humble had bought two neighbouring plots after the fire, he built one large, grand house instead of two smaller ones.
+Look above the gateway: there's a small carved wooden detail with the letters HCKHD – standing for Hans Christensen and his wife, Karen Hans Datter. That was a common way of marking who had built a house.
+The timber framing here is made of heavy oak and has held up beautifully for almost 400 years. Another good place to look for knægte, before we head to one of the town's cosiest spots – underground!`}
+  },
+  { id:5, lat:55.45480, lng:12.18110, walkMin:1,
+    name:{da:"Hugos Vinkælder", en:"Hugo's Wine Cellar"},
+    intro:{da:"En middelalderkælder, der lå gemt bag puds og cement i århundreder.",
+           en:"A medieval cellar that lay hidden behind plaster and cement for centuries."},
+    lookFor:{da:["Den lave, hvælvede dør ned til kælderen","Munkestenene i kældervæggene, hvis I kigger indenfor","Hvor køligt der bliver, jo længere ned man kommer"],
+             en:["The low, arched door down to the cellar","The monastery bricks in the cellar walls, if you peek inside","How cool it gets the further down you go"]},
+    story:{da:`Under huset foran jer, Brogade 19, gemmer der sig noget helt særligt: en ægte middelalderkælder. I mange år var den bare fyldt med cement og puds, og ingen tænkte over, hvad der lå gemt. Men i starten af 1960'erne opdagede nogle af byens arkæologer, at der bag lagene af puds var gamle munkestensmure fra middelalderen.
+Kælderen blev gravet fri og sat i stand, og i 1968 åbnede den som Hugos Vinkælder – opkaldt efter købmand Hugo Jørgensen, der ejede vinhandlen ovenpå. Han ville skabe et sted, hvor byens borgere kunne mødes over et glas vin eller en øl, uden at det blev et almindeligt værtshus.
+I dag kalder køgenserne det bare Hugos Kælder, og mange siger, man ikke rigtig har været i Køge, hvis man ikke har været dernede. Kælderen har efter sigende historier om alt fra et gammelt kloster til gemte grise under krigen!
+Så her er et godt sted at tænke over: hvor mange spændende ting mon der ligger gemt under andre af byens huse, som ingen har opdaget endnu?`,
+    en:`Beneath the house in front of you, Brogade 19, hides something quite special: a genuine medieval cellar. For many years it was simply filled with cement and plaster, and nobody gave a thought to what lay hidden. But in the early 1960s, some of the town's archaeologists discovered that behind the layers of plaster were old monastery-brick walls from the Middle Ages.
+The cellar was dug free and restored, and in 1968 it opened as Hugo's Wine Cellar – named after merchant Hugo Jørgensen, who owned the wine shop above. He wanted to create a place where the town's residents could meet over a glass of wine or a beer, without it becoming an ordinary tavern.
+Today, locals simply call it Hugo's Cellar, and many say you haven't really been to Køge if you haven't been down there. The cellar is said to have stories about everything from an old monastery to pigs hidden during the war!
+So here's something to think about: how many exciting things might be hidden beneath other houses in town that nobody has discovered yet?`}
+  },
+  { id:6, lat:55.45150, lng:12.18650, walkMin:6,
+    name:{da:"Køge Havn", en:"Køge Harbour"},
+    intro:{da:"Havnen, der har givet byen liv i over 700 år.",
+           en:"The harbour that has given the town life for over 700 years."},
+    lookFor:{da:["Bådene og skibene i havnebassinet","Vandet i Køge Bugt – kig ud mod horisonten","Måger og andre fugle, der jager efter mad"],
+             en:["The boats and ships in the harbour basin","The water of Køge Bugt – look out towards the horizon","Gulls and other birds hunting for food"]},
+    story:{da:`Nu er vi nået ned til havnen, som egentlig er grunden til, at Køge overhovedet findes. Byen ligger ved Køge Bugt, og allerede i 1288 fik Køge sine købstadsrettigheder, blandt andet fordi den gode havn gjorde byen perfekt til handel.
+I århundreder sejlede skibe ind og ud herfra med korn, øl, fisk og alt muligt andet. Varerne blev pakket i de store lagerbygninger, I har set i gaderne oppe i byen – nogle af dem har stadig de gamle kældre bevaret, ligesom den, vi lige har besøgt.
+Køge har også en mørkere historie med havet: i 1677 udkæmpede den danske og svenske flåde et af de største søslag i Nordens historie, Slaget i Køge Bugt, lige ude i bugten foran jer. Den danske flåde vandt stort, og det fejres stadig i byens historie.
+I dag er havnen mere fredelig – fyldt med lystbåde og folk, der nyder udsigten. Et godt sted at trække vejret, inden vi går den sidste bid tilbage.`,
+    en:`We've now reached the harbour, which is actually the reason Køge exists at all. The town lies on Køge Bugt, and Køge received its market town charter as early as 1288, partly because the good harbour made it perfect for trade.
+For centuries, ships sailed in and out from here carrying grain, beer, fish and all sorts of other goods. The goods were stored in the large warehouse buildings you've seen in the streets up in town – some of them still have their old cellars intact, just like the one we just visited.
+Køge also has a darker history with the sea: in 1677, the Danish and Swedish fleets fought one of the largest naval battles in Nordic history, the Battle of Køge Bay, right out in the bay in front of you. The Danish fleet won decisively, and it's still celebrated in the town's history.
+Today the harbour is more peaceful – full of pleasure boats and people enjoying the view. A good place to catch your breath before we walk the last stretch back.`}
+  },
+  { id:7, lat:55.45611, lng:12.17972, walkMin:0,
+    name:{da:"Tilbage til Torvet", en:"Back to Torvet"},
+    intro:{da:"Turen slutter, hvor den startede – tillykke!",
+           en:"The walk ends where it began – congratulations!"},
+    lookFor:{da:["Statuen af Frederik VII – hils farvel","De sidste knægte, I kan få øje på","En is eller en kop kaffe på en af cafeerne rundt om pladsen"],
+             en:["The statue of Frederik VII – say goodbye","The last knægte you can spot","An ice cream or a cup of coffee at one of the cafés around the square"]},
+    story:{da:`Og så er vi tilbage på Torvet, hvor det hele begyndte. Tillykke – I har gået gennem over 700 års historie i en af Danmarks bedst bevarede middelalderbyer!
+Tænk på alt, hvad I har set: Danmarks ældste daterede hus, gemt bag 14 lag kalk i 400 år. En borgmesters flotte dobbeltgård, bygget efter en ødelæggende brand. En middelalderkælder, der lå glemt under cement, indtil nogen opdagede munkestenene. Og en havn, der både har handlet korn og udkæmpet et af Nordens største søslag.
+Så er der det store spørgsmål: hvor mange knægte nåede I at tælle undervejs? Der er mange flere at finde, hvis I går en tur mere gennem gaderne!
+Tak, fordi I gik med – og god fornøjelse med resten af dagen i Køge!`,
+    en:`And here we are, back on Torvet, where it all began. Congratulations – you've walked through more than 700 years of history in one of Denmark's best-preserved medieval towns!
+Think about everything you've seen: Denmark's oldest dated house, hidden behind 14 layers of plaster for 400 years. A mayor's grand double courtyard house, built after a devastating fire. A medieval cellar that lay forgotten under cement until someone discovered the monastery bricks. And a harbour that has both traded grain and hosted one of the Nordic region's largest naval battles.
+So here's the big question: how many knægte did you manage to count along the way? There are many more to find if you take another walk through the streets!
+Thank you for walking along – and enjoy the rest of your day in Køge!`}
+  }
 ]}
+
 };
 
 /* ============================================================
@@ -1152,6 +1289,7 @@ function applyLanguage(){
   document.getElementById("langEn").classList.toggle("on",state.lang==="en");
   document.getElementById("tourTrieste").classList.toggle("on",state.tour==="trieste");
   document.getElementById("tourRhodos").classList.toggle("on",state.tour==="rhodos");
+  document.getElementById("tourKoege").classList.toggle("on",state.tour==="koege");
   setGpsTexts(lastGpsKey,lastGpsVars);
   if(userMarker) userMarker.bindPopup(t("youAreHere"));
   refreshPopups();
