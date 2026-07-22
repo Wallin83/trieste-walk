@@ -5,7 +5,7 @@ Bygget som **én HTML-fil** uden frameworks – nem at hoste, nem at ændre.
 
 - **Live:** https://wallin83.github.io/trieste-walk/
 - **Repo:** https://github.com/Wallin83/trieste-walk
-- **Byer:** Trieste 🇮🇹 · Rhodos' gamle by 🇬🇷
+- **Byer:** Trieste 🇮🇹 · Rhodos' gamle by 🇬🇷 · Køge 🇩🇰
 
 ## Filer
 
@@ -79,7 +79,10 @@ Pages bygger automatisk efter ca. 1–2 minutter.
    opgave/leg pr. stop, afsnit adskilt med linjeskift. Følsomme emner formidles
    nænsomt og ærligt.
 4. **Byvælger:** Tilføj et `tour-card` i `#tourPicker` og en knap i
-   Indstillinger → By (kald `setTour('<byId>')`), inkl. flag-emoji.
+   Indstillinger → By (kald `setTour('<byId>')`), inkl. flag-emoji. I
+   Indstillinger-knappen skal der stå `<br>` mellem flag og bynavn
+   (fx `🇩🇰<br>Køge`), ellers ombrydes korte bynavne ikke som de andre
+   og ser anderledes ud i layoutet.
 5. **Deploy** som beskrevet ovenfor. Offline-download og fremdrift virker
    automatisk for den nye by – ingen ændringer i sw.js nødvendige.
 
