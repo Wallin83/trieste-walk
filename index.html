@@ -718,7 +718,7 @@ function speakNext(){
   u.rate=state.rate; u.volume=state.volume;
   let finished=false;
   const finish=()=>{
-    if(finished || speakingStop===null) return;
+    if(finished || speakingStop===null || isPaused) return;
     finished=true; inGap=true;
     // Pausen skaleres med talehastigheden
     gapTimer=setTimeout(()=>{ if(!isPaused) speakNext(); }, item.gap/state.rate);
@@ -737,13 +737,15 @@ function playStop(id){
 function pauseSpeech(){
   if(!("speechSynthesis" in window)||speakingStop===null) return;
   if(!isPaused){
+    // iOS' indbyggede pause/resume virker kun én gang, så vi pauser i stedet
+    // ved at stoppe lyden og huske sætningen – "Fortsæt" starter fra dén sætning.
     isPaused=true;
-    if(inGap){ clearTimeout(gapTimer); }          // pause ramt mellem to sætninger
-    else{ try{ speechSynthesis.pause(); }catch(e){} }
+    clearTimeout(gapTimer);
+    if(!inGap && speechIdx>0) speechIdx--;   // genoptag fra den afbrudte sætning
+    try{ speechSynthesis.cancel(); }catch(e){}
   }else{
     isPaused=false;
-    if(speechSynthesis.paused){ try{ speechSynthesis.resume(); }catch(e){} }
-    else{ speakNext(); }                           // vi holdt pause i et mellemrum
+    speakNext();
   }
   renderAll();
 }
