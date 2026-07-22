@@ -5,22 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#175E63">
-<title>Trieste City Walk</title>
+<title>City Walks</title>
 
 <!-- ============================================================
-     TRIESTE CITY WALK  ·  Dansk / English
-     Selvguidet gåtur med kort, GPS og lydguide i én HTML-fil.
-     Biblioteker: Leaflet (CDN) + OpenStreetMap. Lyd: Web Speech API.
+     CITY WALKS · Trieste & Rhodos · Dansk / English
+     Selvguidede gåture med kort, GPS og lydguide i én HTML-fil.
+     Byvalget huskes i localStorage; fremdrift gemmes pr. by.
      ============================================================ -->
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&display=swap">
 
 <style>
-/* ---------- Designtokens: varmt adriaterhavs-udtryk ---------- */
 :root{
   --sea:#175E63; --sea-deep:#0E3F44;
   --stone:#F5EFE4; --card:#FFFFFF;
@@ -47,7 +45,6 @@ body{
 }
 h1,h2,h3,.display{font-family:"Fraunces", Georgia, serif;}
 
-/* ---------- Toptavle ---------- */
 header{
   position:sticky; top:0; z-index:900; background:var(--sea); color:#fff;
   padding:calc(10px + env(safe-area-inset-top)) 16px 12px;
@@ -62,13 +59,11 @@ header .sub{font-size:.85rem; opacity:.85;}
 .progress-fill{height:100%; width:0%; background:var(--ochre); border-radius:99px; transition:width .4s ease;}
 .progress-meta{display:flex; justify-content:space-between; font-size:.8rem; margin-top:5px; opacity:.92;}
 
-/* ---------- Visninger ---------- */
 .view{display:none; animation:fadein .25s ease;}
 .view.active{display:block;}
 @keyframes fadein{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;}}
 .pad{padding:16px;}
 
-/* ---------- Kort ---------- */
 #mapWrap{position:relative;}
 #map{height:60dvh; min-height:300px; z-index:1; background:#CFE3E1;} /* præcis højde sættes i JS (sizeMap) */
 .map-fallback{display:flex; align-items:center; justify-content:center; text-align:center;
@@ -99,7 +94,6 @@ header .sub{font-size:.85rem; opacity:.85;}
 .leaflet-popup-content{font-size:1rem;}
 .leaflet-popup-content button{margin-top:8px; width:100%;}
 
-/* ---------- Knapper ---------- */
 button{
   font:inherit; border:none; cursor:pointer; border-radius:14px; padding:14px 18px;
   font-size:1rem; font-weight:600; background:var(--card); color:var(--ink);
@@ -114,13 +108,10 @@ button:active{transform:scale(.985);}
 button:disabled{opacity:.45;}
 .pulse{animation:pulse 1.4s ease infinite;}
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(192,96,58,.55);} 50%{box-shadow:0 0 0 12px rgba(192,96,58,0);}}
-
-/* Sprogvælger (segmenteret kontrol) */
 .seg{display:flex; gap:8px;}
 .seg button{flex:1;}
 .seg button.on{background:var(--sea); color:#fff; border:none;}
 
-/* ---------- Stop-kort ---------- */
 .card{
   background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
   box-shadow:var(--shadow); padding:18px; margin-bottom:16px;
@@ -152,20 +143,17 @@ button:disabled{opacity:.45;}
 details.story-box{margin-top:12px;}
 details.story-box summary{font-weight:700; cursor:pointer; color:var(--sea); padding:6px 0;}
 
-/* Liste over alle stop */
 .stop-row{display:flex; align-items:center; gap:12px; width:100%; text-align:left; padding:14px; margin-bottom:10px;}
 .stop-row .grow{flex:1; min-width:0;}
 .stop-row .name{font-weight:700;}
 .stop-row .meta{font-size:.82rem; color:var(--ink-soft);}
 .stop-row .chev{color:var(--ink-soft);}
 
-/* ---------- Indstillinger ---------- */
 .setting{margin-bottom:20px;}
 .setting label{display:block; font-weight:700; margin-bottom:6px;}
 input[type=range]{width:100%; accent-color:var(--sea); height:34px;}
 .hint{font-size:.85rem; color:var(--ink-soft); margin-top:4px;}
 
-/* ---------- Bundmenu ---------- */
 nav{
   position:fixed; left:0; right:0; bottom:0; z-index:1000; display:flex;
   background:var(--card); border-top:1px solid var(--line);
@@ -179,7 +167,6 @@ nav button{
 nav button .ico{font-size:1.35rem; line-height:1;}
 nav button.active{color:var(--sea);}
 
-/* ---------- Toast ---------- */
 #toast{
   position:fixed; left:50%; bottom:calc(var(--nav-h) + 18px + env(safe-area-inset-bottom));
   transform:translateX(-50%) translateY(20px);
@@ -189,14 +176,45 @@ nav button.active{color:var(--sea);}
 }
 @media (prefers-color-scheme: dark){ #toast{background:#245A60;} }
 #toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+/* Byvælger-overlay ved første åbning */
+#tourPicker{
+  display:none; position:fixed; inset:0; z-index:2000; background:var(--stone);
+  padding:calc(30px + env(safe-area-inset-top)) 20px 30px; overflow:auto;
+}
+#tourPicker h1{margin:0 0 4px; font-size:2rem;}
+#tourPicker .sub{color:var(--ink-soft); margin:0 0 22px;}
+.tour-card{width:100%; text-align:left; display:flex; align-items:center; gap:16px; padding:20px; margin-bottom:14px;}
+.tour-card .flag{font-size:2.2rem;}
+.tour-card .tname{font-family:"Fraunces", Georgia, serif; font-size:1.35rem; font-weight:700;}
+.tour-card .tmeta{font-size:.85rem; color:var(--ink-soft); margin-top:2px;}
+
 @media (prefers-reduced-motion: reduce){ *{animation:none !important; transition:none !important;} }
 </style>
 </head>
 <body>
 
+<!-- ============ BYVÆLGER (første åbning) ============ -->
+<div id="tourPicker">
+  <h1 class="display">City Walks</h1>
+  <p class="sub">Vælg din by · Choose your city</p>
+  <button class="card tour-card" onclick="chooseTour('trieste')">
+    <span class="flag">🇮🇹</span>
+    <span><span class="tname">Trieste</span><br>
+    <span class="tmeta">10 stop · ca. 3,5 km · 2–3 timer / hours</span></span>
+  </button>
+  <button class="card tour-card" onclick="chooseTour('rhodos')">
+    <span class="flag">🇬🇷</span>
+    <span><span class="tname">Rhodos · Rhodes</span><br>
+    <span class="tmeta">10 stop · ca. 2,5 km · 2–3 timer / hours</span></span>
+  </button>
+  <p class="hint">Valget huskes – det kan altid ændres under Indstillinger.<br>
+  Your choice is remembered – change it anytime in Settings.</p>
+</div>
+
 <header>
   <div class="row">
-    <h1>Trieste City Walk</h1>
+    <h1 id="appTitle">City Walk</h1>
     <span class="sub" id="hdrRemaining">–</span>
   </div>
   <div class="row" style="margin-top:2px;">
@@ -212,7 +230,6 @@ nav button.active{color:var(--sea);}
   </div>
 </header>
 
-<!-- KORT -->
 <section id="view-map" class="view active">
   <div id="mapWrap">
     <div id="map"></div>
@@ -226,12 +243,10 @@ nav button.active{color:var(--sea);}
   <div class="pad" id="gpsNoteWrap"><div class="card" id="gpsNote"></div></div>
 </section>
 
-<!-- AKTUELT STOP -->
 <section id="view-current" class="view">
   <div class="pad" id="currentStopContainer"></div>
 </section>
 
-<!-- ALLE STOP -->
 <section id="view-all" class="view">
   <div class="pad">
     <h2 class="display" id="allTitle" style="margin:4px 0 4px;"></h2>
@@ -241,13 +256,19 @@ nav button.active{color:var(--sea);}
   </div>
 </section>
 
-<!-- INDSTILLINGER -->
 <section id="view-settings" class="view">
   <div class="pad">
     <h2 class="display" id="settingsTitle" style="margin:4px 0 16px;"></h2>
 
     <div class="card">
       <div class="setting" style="margin-bottom:14px;">
+        <label id="lblCity">By / City</label>
+        <div class="seg">
+          <button id="tourTrieste" onclick="setTour('trieste')">🇮🇹 Trieste</button>
+          <button id="tourRhodos" onclick="setTour('rhodos')">🇬🇷 Rhodos</button>
+        </div>
+      </div>
+      <div class="setting" style="margin-bottom:6px;">
         <label id="lblLang"></label>
         <div class="seg">
           <button id="langDa" onclick="setLang('da')">🇩🇰 Dansk</button>
@@ -306,7 +327,7 @@ nav button.active{color:var(--sea);}
 
 <script>
 /* ============================================================
-   1) UI-TEKSTER PÅ BEGGE SPROG
+   1) UI-TEKSTER
    ============================================================ */
 const T={
 da:{
@@ -316,32 +337,32 @@ da:{
   waitingGps:"Venter på GPS …", nextStopInfo:"Næste stop", allDoneInfo:"Alle stop er gennemført 🎉",
   now:"Nu", next:"Næste", goal:"mål!", ofStops:"af 10 stop", left:"tilbage", approx:"Ca.",
   allTitle:"Hele ruten",
-  routeSummary:"10 stop · ca. 3,5 km · ca. 47 min ren gåtid (2–3 timer med stop).",
   reset:"Nulstil hele turen",
-  resetConfirm:"Vil du nulstille hele turen? Gennemførte stop slettes.",
+  resetConfirm:"Vil du nulstille turen i denne by? Gennemførte stop slettes.",
   resetDone:"Turen er nulstillet – god tur!",
   settingsTitle:"Indstillinger", lblLang:"Sprog / Language",
   lblRate:"Talehastighed:", lblVolume:"Lydstyrke:", lblVoice:"Oplæsningsstemme",
   lblGps:"GPS-status", btnCompass:"Aktivér kompas",
   compassHint:"På iPhone skal kompasset have din tilladelse først.",
   lblOffline:"Offline", btnOffline:"Hent kort til offline-brug", btnOfflineBusy:"Henter … {p} %",
-  offlineHint:"Henter ca. 5 MB kortudsnit for hele ruten. Fortællinger og GPS virker allerede uden internet – oplæsning kræver blot en hentet stemme på telefonen.",
+  offlineHint:"Henter ca. 5 MB kortudsnit for den valgte bys rute. Fortællinger og GPS virker allerede uden internet – oplæsning kræver blot en hentet stemme på telefonen.",
   offlineDone:"Offline-kort er hentet ✓ Appen virker nu uden internet.",
   offlineFail:"Nogle kortfliser kunne ikke hentes – prøv igen på wi-fi.",
   offlineNoSw:"Offline kræver HTTPS – det virker på jeres webadresse, men ikke fra en lokal fil.",
   aboutTitle:"Om turen",
-  aboutText:"Ca. 3,5 km til fods gennem Triestes historiske centrum – regn med 2–3 timer med stop, is og pauser. Turen starter og slutter ved The Modernist Hotel, Corso Italia 12. God tur!",
   play:"▶︎ Afspil fortælling", pause:"Pause", resume:"Fortsæt", stop:"Stop",
+  seekStart:"Start", seekEnd:"Slut",
   readStory:"Læs fortællingen", lookFor:"👀 Se efter dette",
   walkNext:"Gåtid til næste stop: ca. {m} min.", endsHere:"Turen slutter her", minToNext:"{m} min til næste",
   openApple:"Åbn i Apple Maps", openGoogle:"Åbn i Google Maps",
   prev:"← Forrige", nextBtn:"Næste stop →",
   markDone:"✓ Markér som gennemført", skip:"Vi springer dette stop over",
   fromHere:"{d} herfra", arrived:"Du er fremme", completed:"Gennemført", skipped:"Sprunget over",
-  playingNow:"🔊 Læser op nu", pausedBadge:"⏸ Pause i oplæsning", seekStart:"Start", seekEnd:"Slut",
+  playingNow:"🔊 Læser op nu", pausedBadge:"⏸ Pause i oplæsning",
   arrivedToast:"Du er fremme ved stop {n}: {name} 🎧",
   doneToast:"Godt gået! Næste stop: {name}", allDoneToast:"🎉 Hele turen er gennemført – tillykke!",
   skipToast:"Stoppet er sprunget over – det kan altid genåbnes fra listen.",
+  tourSwitched:"Byen er skiftet til {name}.",
   noSpeech:"Oplæsning understøttes ikke – læs teksten i stedet.",
   noSpeechSetting:"Oplæsning understøttes ikke i denne browser. Du kan stadig læse alle fortællinger selv.",
   voiceFound:"Stemme: {name}. ",
@@ -368,32 +389,32 @@ en:{
   waitingGps:"Waiting for GPS …", nextStopInfo:"Next stop", allDoneInfo:"All stops completed 🎉",
   now:"Now", next:"Next", goal:"finish!", ofStops:"of 10 stops", left:"left", approx:"About",
   allTitle:"The full route",
-  routeSummary:"10 stops · approx. 3.5 km · about 47 min of pure walking (2–3 hours with stops).",
   reset:"Reset the whole tour",
-  resetConfirm:"Reset the whole tour? Completed stops will be cleared.",
+  resetConfirm:"Reset the tour in this city? Completed stops will be cleared.",
   resetDone:"Tour reset – enjoy the walk!",
   settingsTitle:"Settings", lblLang:"Sprog / Language",
   lblRate:"Speech rate:", lblVolume:"Volume:", lblVoice:"Narration voice",
   lblGps:"GPS status", btnCompass:"Enable compass",
   compassHint:"On iPhone the compass needs your permission first.",
   lblOffline:"Offline", btnOffline:"Download maps for offline use", btnOfflineBusy:"Downloading … {p} %",
-  offlineHint:"Downloads ~5 MB of map tiles for the whole route. Stories and GPS already work without internet – narration just requires a downloaded voice on the phone.",
+  offlineHint:"Downloads ~5 MB of map tiles for the selected city's route. Stories and GPS already work without internet – narration just requires a downloaded voice on the phone.",
   offlineDone:"Offline maps downloaded ✓ The app now works without internet.",
   offlineFail:"Some map tiles failed to download – try again on wi-fi.",
   offlineNoSw:"Offline requires HTTPS – it works on your web address, but not from a local file.",
   aboutTitle:"About the walk",
-  aboutText:"Approx. 3.5 km on foot through Trieste's historic centre – allow 2–3 hours with stops, gelato and breaks. The tour starts and ends at The Modernist Hotel, Corso Italia 12. Enjoy!",
   play:"▶︎ Play story", pause:"Pause", resume:"Resume", stop:"Stop",
+  seekStart:"Start", seekEnd:"End",
   readStory:"Read the story", lookFor:"👀 Look out for",
   walkNext:"Walking time to next stop: about {m} min.", endsHere:"The tour ends here", minToNext:"{m} min to next",
   openApple:"Open in Apple Maps", openGoogle:"Open in Google Maps",
   prev:"← Previous", nextBtn:"Next stop →",
   markDone:"✓ Mark as completed", skip:"We'll skip this stop",
   fromHere:"{d} from here", arrived:"You've arrived", completed:"Completed", skipped:"Skipped",
-  playingNow:"🔊 Playing now", pausedBadge:"⏸ Narration paused", seekStart:"Start", seekEnd:"End",
+  playingNow:"🔊 Playing now", pausedBadge:"⏸ Narration paused",
   arrivedToast:"You've arrived at stop {n}: {name} 🎧",
   doneToast:"Well done! Next stop: {name}", allDoneToast:"🎉 Tour complete – congratulations!",
   skipToast:"Stop skipped – you can always reopen it from the list.",
+  tourSwitched:"City switched to {name}.",
   noSpeech:"Narration isn't supported – please read the text instead.",
   noSpeechSetting:"Narration isn't supported in this browser. You can still read all the stories yourself.",
   voiceFound:"Voice: {name}. ",
@@ -417,202 +438,425 @@ function t(k){ return T[state.lang][k] || T.da[k] || k; }
 function tf(k,vars){ let s=t(k); Object.keys(vars||{}).forEach(v=>s=s.replace("{"+v+"}",vars[v])); return s; }
 
 /* ============================================================
-   2) RUTEDATA – alle tekster på dansk og engelsk
+   2) TURDATA – Trieste og Rhodos' gamle by
    ============================================================ */
-const STOPS=[
-{ id:0, lat:45.64998, lng:13.77299, walkMin:3,
-  name:{da:"The Modernist Hotel", en:"The Modernist Hotel"},
-  intro:{da:"Vores startpunkt på Corso Italia – midt i byens hjerte.",
-         en:"Our starting point on Corso Italia – right in the heart of the city."},
-  lookFor:{da:["De brede fortove og sporvognsskinnerne på Corso Italia","Mågerne – Triestes højlydte indbyggere nummer ét","Vinden! Kan du mærke, om boraen er på besøg i dag?"],
-           en:["The wide pavements and tram tracks on Corso Italia","The seagulls – Trieste's loudest residents","The wind! Can you feel whether the Bora is visiting today?"]},
-  story:{da:`Velkommen til Trieste – og velkommen til jeres helt egen byvandring! Vi står nu foran The Modernist Hotel på Corso Italia, en af byens store handelsgader. Herfra går vi de næste par timer gennem en by, der er noget helt særligt i Italien.
+const TOURS={
+
+/* ------------------------- TRIESTE ------------------------- */
+trieste:{
+  title:{da:"Trieste City Walk", en:"Trieste City Walk"},
+  cityName:{da:"Trieste", en:"Trieste"},
+  center:[45.6497,13.7695], zoom:15,
+  summary:{da:"10 stop · ca. 3,5 km · ca. 47 min ren gåtid (2–3 timer med stop).",
+           en:"10 stops · approx. 3.5 km · about 47 min of pure walking (2–3 hours with stops)."},
+  about:{da:"Ca. 3,5 km til fods gennem Triestes historiske centrum – regn med 2–3 timer med stop, is og pauser. Turen starter og slutter ved The Modernist Hotel, Corso Italia 12. God tur!",
+         en:"Approx. 3.5 km on foot through Trieste's historic centre – allow 2–3 hours with stops, gelato and breaks. The tour starts and ends at The Modernist Hotel, Corso Italia 12. Enjoy!"},
+  stops:[
+  { id:0, lat:45.64998, lng:13.77299, walkMin:3,
+    name:{da:"The Modernist Hotel", en:"The Modernist Hotel"},
+    intro:{da:"Vores startpunkt på Corso Italia – midt i byens hjerte.",
+           en:"Our starting point on Corso Italia – right in the heart of the city."},
+    lookFor:{da:["De brede fortove og sporvognsskinnerne på Corso Italia","Mågerne – Triestes højlydte indbyggere nummer ét","Vinden! Kan du mærke, om boraen er på besøg i dag?"],
+             en:["The wide pavements and tram tracks on Corso Italia","The seagulls – Trieste's loudest residents","The wind! Can you feel whether the Bora is visiting today?"]},
+    story:{da:`Velkommen til Trieste – og velkommen til jeres helt egen byvandring! Vi står nu foran The Modernist Hotel på Corso Italia, en af byens store handelsgader. Herfra går vi de næste par timer gennem en by, der er noget helt særligt i Italien.
 Trieste ligger nemlig klemt inde mellem høje klipper og det blå Adriaterhav, helt ude i Italiens østligste hjørne – Slovenien er kun få kilometer væk. I næsten 500 år hørte byen slet ikke til Italien, men til det store østrigske kejserrige. Kejseren i Wien havde brug for en havn, og Trieste blev hans vindue mod havet. Derfor ligner byen på mange måder mere Wien end Rom: store, prægtige bygninger, kaffehuse og brede gader.
 Og så er der vinden! Trieste er berømt for boraen – en iskold vind, der kommer farende ned fra bjergene og kan blæse med over 150 kilometer i timen. Når den er værst, spænder man reb ud i gaderne, så folk har noget at holde fast i. Prøv lige at mærke efter: Blæser det i dag?
 En sidste ting, inden vi går: Trieste er Italiens kaffehovedstad. Skibene har bragt kaffebønner hertil i hundredvis af år, og byens berømte kaffemærke illy kender man i hele verden. Så dufter det af kaffe undervejs, er det helt normalt.
 Klar? Så går vi mod første plads – det tager kun et par minutter.`,
-  en:`Welcome to Trieste – and welcome to your very own city walk! We're standing in front of The Modernist Hotel on Corso Italia, one of the city's grand shopping streets. From here, we'll spend the next couple of hours walking through a city that is truly unique in Italy.
+    en:`Welcome to Trieste – and welcome to your very own city walk! We're standing in front of The Modernist Hotel on Corso Italia, one of the city's grand shopping streets. From here, we'll spend the next couple of hours walking through a city that is truly unique in Italy.
 Trieste sits squeezed between high cliffs and the blue Adriatic Sea, in Italy's far eastern corner – Slovenia is only a few kilometres away. For almost 500 years, the city didn't belong to Italy at all, but to the great Austrian empire. The emperor in Vienna needed a port, and Trieste became his window to the sea. That's why the city looks more like Vienna than Rome in many ways: grand, stately buildings, coffee houses and wide streets.
 And then there's the wind! Trieste is famous for the Bora – an ice-cold wind that comes racing down from the mountains and can blow at over 150 kilometres per hour. When it's at its worst, ropes are stretched along the streets so people have something to hold on to. Have a feel right now: is it windy today?
 One last thing before we set off: Trieste is Italy's coffee capital. Ships have brought coffee beans here for hundreds of years, and the city's famous coffee brand, illy, is known all over the world. So if you smell coffee along the way, that's perfectly normal.
 Ready? Then let's head for the first square – it only takes a couple of minutes.`}
-},
-{ id:1, lat:45.65034, lng:13.77021, walkMin:3,
-  name:{da:"Piazza della Borsa", en:"Piazza della Borsa"},
-  intro:{da:"Byens gamle handelsplads med børsen, der ligner et græsk tempel.",
-         en:"The city's old trading square, with a stock exchange that looks like a Greek temple."},
-  lookFor:{da:["Den gamle børsbygning med de store søjler – prøv at tælle dem","Neptunstatuen med sin trefork","Tergesteo-bygningen med den fine glasoverdækkede passage"],
-           en:["The old stock exchange with its tall columns – try counting them","The statue of Neptune with his trident","The Tergesteo building with its elegant glass-covered arcade"]},
-  story:{da:`Nu står vi på Piazza della Borsa – Børspladsen. For to hundrede år siden var det her, byens rigdom blev skabt. Kig på den store hvide bygning, der ligner et græsk tempel med høje søjler foran. Det er den gamle børs fra 1806. Herinde stod købmænd og råbte i munden på hinanden, mens de handlede med alt det, skibene bragte til havnen: kaffe, krydderier, stof, korn og meget mere.
+  },
+  { id:1, lat:45.65034, lng:13.77021, walkMin:3,
+    name:{da:"Piazza della Borsa", en:"Piazza della Borsa"},
+    intro:{da:"Byens gamle handelsplads med børsen, der ligner et græsk tempel.",
+           en:"The city's old trading square, with a stock exchange that looks like a Greek temple."},
+    lookFor:{da:["Den gamle børsbygning med de store søjler – prøv at tælle dem","Neptunstatuen med sin trefork","Tergesteo-bygningen med den fine glasoverdækkede passage"],
+             en:["The old stock exchange with its tall columns – try counting them","The statue of Neptune with his trident","The Tergesteo building with its elegant glass-covered arcade"]},
+    story:{da:`Nu står vi på Piazza della Borsa – Børspladsen. For to hundrede år siden var det her, byens rigdom blev skabt. Kig på den store hvide bygning, der ligner et græsk tempel med høje søjler foran. Det er den gamle børs fra 1806. Herinde stod købmænd og råbte i munden på hinanden, mens de handlede med alt det, skibene bragte til havnen: kaffe, krydderier, stof, korn og meget mere.
 Prøv at tælle søjlerne på bygningen – hvor mange kan du finde? De skulle få købmændene til at føle, at de handlede i et tempel, næsten som om penge var noget helligt.
 Midt på pladsen finder du en statue af Neptun, havets gud med sit lange skæg og sin trefork. Det er selvfølgelig ikke tilfældigt: Alt i Trieste handlede om havet. Uden skibene – ingen by.
 Læg også mærke til bygningen Tergesteo ved siden af, med en fin passage af glas indeni. Tergeste var faktisk byens navn i romertiden, for Trieste er langt ældre end de fleste tror – det vender vi tilbage til om lidt, når vi møder romerne.
 En lille historie til turen: Når boravinden raser om vinteren, kan den vælte skraldespande, cykler og næsten også mennesker her på de åbne pladser. Derfor gik triesterne i gamle dage med sten i lommerne, siges det – så de ikke blæste væk! Om det passer? Det må du selv vurdere.
 Nu går vi videre til byens allerstørste stjerne: en plads, der er åben helt ud mod havet.`,
-  en:`We're now standing on Piazza della Borsa – Stock Exchange Square. Two hundred years ago, this is where the city's wealth was made. Look at the big white building that resembles a Greek temple with tall columns at the front. That's the old stock exchange from 1806. Inside, merchants stood shouting over one another as they traded everything the ships brought to the harbour: coffee, spices, cloth, grain and much more.
+    en:`We're now standing on Piazza della Borsa – Stock Exchange Square. Two hundred years ago, this is where the city's wealth was made. Look at the big white building that resembles a Greek temple with tall columns at the front. That's the old stock exchange from 1806. Inside, merchants stood shouting over one another as they traded everything the ships brought to the harbour: coffee, spices, cloth, grain and much more.
 Try counting the columns on the building – how many can you find? They were meant to make the merchants feel they were trading inside a temple, almost as if money were something sacred.
 In the middle of the square you'll find a statue of Neptune, god of the sea, with his long beard and trident. That's no coincidence, of course: everything in Trieste revolved around the sea. No ships – no city.
 Also notice the Tergesteo building next door, with a fine glass arcade inside. Tergeste was actually the city's name in Roman times, because Trieste is far older than most people think – we'll come back to that shortly, when we meet the Romans.
 A little story for the road: when the Bora wind rages in winter, it can knock over bins, bicycles and very nearly people on these open squares. That's why, in the old days, the people of Trieste were said to walk around with stones in their pockets – so they wouldn't blow away! Is it true? You'll have to judge for yourself.
 Now let's move on to the city's biggest star: a square that opens straight onto the sea.`}
-},
-{ id:2, lat:45.65008, lng:13.76776, walkMin:5,
-  name:{da:"Piazza Unità d'Italia", en:"Piazza Unità d'Italia"},
-  intro:{da:"Europas største plads med åbent hav på den ene side.",
-         en:"Europe's largest square, with open sea on one side."},
-  lookFor:{da:["De to bronzefigurer øverst på rådhusets klokketårn","De Fire Kontinenters Fontæne – hvilke verdensdele mangler?","De små blå lys i belægningen, når det bliver mørkt"],
-           en:["The two bronze figures on top of the town hall's bell tower","The Fountain of the Four Continents – which continents are missing?","The little blue lights in the paving after dark"]},
-  story:{da:`Wow – kig engang! Du står nu på Piazza Unità d'Italia, og den er noget helt særligt: Det er Europas største plads, der ligger direkte ud til havet. På tre sider er du omgivet af kæmpestore paladser, og på den fjerde side er der bare … hav. Blåt, glitrende Adriaterhav, så langt øjet rækker.
+  },
+  { id:2, lat:45.65008, lng:13.76776, walkMin:5,
+    name:{da:"Piazza Unità d'Italia", en:"Piazza Unità d'Italia"},
+    intro:{da:"Europas største plads med åbent hav på den ene side.",
+           en:"Europe's largest square, with open sea on one side."},
+    lookFor:{da:["De to bronzefigurer øverst på rådhusets klokketårn","De Fire Kontinenters Fontæne – hvilke verdensdele mangler?","De små blå lys i belægningen, når det bliver mørkt"],
+             en:["The two bronze figures on top of the town hall's bell tower","The Fountain of the Four Continents – which continents are missing?","The little blue lights in the paving after dark"]},
+    story:{da:`Wow – kig engang! Du står nu på Piazza Unità d'Italia, og den er noget helt særligt: Det er Europas største plads, der ligger direkte ud til havet. På tre sider er du omgivet af kæmpestore paladser, og på den fjerde side er der bare … hav. Blåt, glitrende Adriaterhav, så langt øjet rækker.
 Bygningerne her blev opført, da Trieste var østrigernes fine havneby, og de skulle vise hele verden, hvor rig byen var. Vend dig mod den store bygning med klokketårnet – det er rådhuset. Øverst oppe står to bronzefigurer, som triesterne kalder Mikeze og Jakeze. De har slået timeslag på klokken i over hundrede år. Kan du få øje på dem deroppe?
 Find nu den gamle fontæne på pladsen: De Fire Kontinenters Fontæne. Da den blev bygget i 1750'erne, kendte man kun fire verdensdele – Europa, Asien, Afrika og Amerika. Her er en opgave: Hvilke verdensdele mangler? Rigtigt – Australien og Antarktis var endnu ikke opdaget af europæerne!
 Pladsen har oplevet både fest og alvor. Kejsere og konger har holdt taler her, og i dag samles folk til koncerter og fodboldfejringer. Når det bliver aften, tændes små blå lys i belægningen – de skal minde om, at havet engang gik helt herop.
 Og en sjov detalje: Forfatteren James Joyce, en af verdens mest berømte, boede mange år i Trieste og drak kaffe i caféerne heromkring. Ham møder vi igen senere på turen – som statue!
 Nu skal vi helt ud over vandet. Bogstaveligt talt.`,
-  en:`Wow – just look at this! You're now standing on Piazza Unità d'Italia, and it's something very special: it's Europe's largest square facing directly onto the sea. On three sides you're surrounded by enormous palaces, and on the fourth side there's just… sea. Blue, glittering Adriatic, as far as the eye can see.
+    en:`Wow – just look at this! You're now standing on Piazza Unità d'Italia, and it's something very special: it's Europe's largest square facing directly onto the sea. On three sides you're surrounded by enormous palaces, and on the fourth side there's just… sea. Blue, glittering Adriatic, as far as the eye can see.
 The buildings here were put up when Trieste was Austria's grand port city, and they were meant to show the whole world how rich the city was. Turn towards the big building with the bell tower – that's the town hall. At the very top stand two bronze figures the locals call Mikeze and Jakeze. They've been striking the hours on the bell for over a hundred years. Can you spot them up there?
 Now find the old fountain on the square: the Fountain of the Four Continents. When it was built in the 1750s, only four continents were known – Europe, Asia, Africa and America. Here's a challenge: which continents are missing? That's right – Australia and Antarctica hadn't yet been discovered by Europeans!
 The square has seen both celebration and sorrow. Emperors and kings have given speeches here, and today people gather for concerts and football celebrations. When evening comes, little blue lights switch on in the paving – a reminder that the sea once reached all the way up here.
 And a fun detail: the writer James Joyce, one of the world's most famous, lived in Trieste for many years and drank coffee in the cafés around here. We'll meet him again later on the walk – as a statue!
 Next, we're heading right out over the water. Literally.`}
-},
-{ id:3, lat:45.65258, lng:13.76549, walkMin:9,
-  name:{da:"Molo Audace", en:"Molo Audace"},
-  intro:{da:"En 246 meter lang mole – en gåtur lige ud i Adriaterhavet.",
-         en:"A 246-metre pier – a walk straight out into the Adriatic."},
-  lookFor:{da:["Vindrosen af bronze ude for enden af molen","Skibe, færger og måske et kæmpe krydstogtskib","Miramare-slottet langt ude ad kysten mod nordvest"],
-           en:["The bronze wind rose at the end of the pier","Ships, ferries and perhaps a giant cruise liner","Miramare Castle far along the coast to the north-west"]},
-  story:{da:`Nu går vi en tur på havet – uden at blive våde! Molo Audace er en 246 meter lang stenmole, der stikker lige ud i Adriaterhavet. Gå med helt ud til enden, det er det hele værd.
+  },
+  { id:3, lat:45.65258, lng:13.76549, walkMin:9,
+    name:{da:"Molo Audace", en:"Molo Audace"},
+    intro:{da:"En 246 meter lang mole – en gåtur lige ud i Adriaterhavet.",
+           en:"A 246-metre pier – a walk straight out into the Adriatic."},
+    lookFor:{da:["Vindrosen af bronze ude for enden af molen","Skibe, færger og måske et kæmpe krydstogtskib","Miramare-slottet langt ude ad kysten mod nordvest"],
+             en:["The bronze wind rose at the end of the pier","Ships, ferries and perhaps a giant cruise liner","Miramare Castle far along the coast to the north-west"]},
+    story:{da:`Nu går vi en tur på havet – uden at blive våde! Molo Audace er en 246 meter lang stenmole, der stikker lige ud i Adriaterhavet. Gå med helt ud til enden, det er det hele værd.
 Molen gemmer på en hemmelighed: Den er bygget oven på et skibsvrag! I 1740 sank skibet San Carlo netop her i havnen. I stedet for at fjerne vraget brugte man det som fundament og byggede molen henover. Så lige nu går du faktisk oven på et rigtigt, gammelt skib.
 Navnet Audace kom til i 1918, ved Første Verdenskrigs afslutning. Da krigen sluttede, og Trieste efter næsten 500 år under Østrig skulle være italiensk, var det italienske krigsskib Audace det allerførste, der lagde til – præcis her ved molen. Det var en kæmpe dag for byen, og molen fik skibets navn.
 Ude for enden finder du en vindrose af bronze i belægningen – en slags kompas, der viser alle vindretninger. Den er støbt af bronze fra en erobret kanon. Stil dig på den og find ud af: Hvilken vej er nord? Det er dén vej, boravinden kommer fra!
 Kig så ud over vandet. Mod nordvest, langt ude ad kysten, kan man i klart vejr skimte det hvide eventyrslot Miramare, bygget af en østrigsk ærkehertug. Og overalt: skibe, sejlbåde, måger. Om aftenen sidder halvdelen af Trieste herude med benene ud over kanten og ser solen gå ned.
 Næste stop er noget helt andet: Nu rejser vi 2000 år tilbage i tiden.`,
-  en:`Now we're going for a walk on the sea – without getting wet! Molo Audace is a 246-metre stone pier jutting straight out into the Adriatic. Walk all the way to the end – it's well worth it.
+    en:`Now we're going for a walk on the sea – without getting wet! Molo Audace is a 246-metre stone pier jutting straight out into the Adriatic. Walk all the way to the end – it's well worth it.
 The pier holds a secret: it's built on top of a shipwreck! In 1740, the ship San Carlo sank right here in the harbour. Instead of removing the wreck, it was used as a foundation, and the pier was built over it. So right now, you're actually walking on top of a real, old ship.
 The name Audace arrived in 1918, at the end of the First World War. When the war ended and Trieste, after almost 500 years under Austria, was to become Italian, the Italian warship Audace was the very first to dock – exactly here at this pier. It was a huge day for the city, and the pier took the ship's name.
 At the far end, you'll find a bronze wind rose set into the paving – a kind of compass showing all the wind directions. It was cast from the bronze of a captured cannon. Stand on it and work out: which way is north? That's the direction the Bora wind comes from!
 Now look out over the water. To the north-west, far along the coast, on a clear day you can glimpse the white fairy-tale castle of Miramare, built by an Austrian archduke. And everywhere: ships, sailing boats, seagulls. In the evening, half of Trieste sits out here with their legs dangling over the edge, watching the sun go down.
 The next stop is something completely different: we're travelling 2,000 years back in time.`}
-},
-{ id:4, lat:45.64911, lng:13.77181, walkMin:4,
-  name:{da:"Teatro Romano", en:"Teatro Romano"},
-  intro:{da:"Et rigtigt romersk teater midt i byen – 2000 år gammelt.",
-         en:"A real Roman theatre in the middle of the city – 2,000 years old."},
-  lookFor:{da:["De halvcirkelformede stenrækker, hvor publikum sad","Resterne af scenen nederst","San Giusto-bakken, der rejser sig bag teatret – dér skal vi op senere"],
-           en:["The semicircular stone rows where the audience sat","The remains of the stage at the bottom","San Giusto hill rising behind the theatre – we're heading up there later"]},
-  story:{da:`Kan du se stentrapperne foran dig, formet som en kæmpe halvcirkel? Du står ved Teatro Romano – et ægte romersk teater, bygget for cirka 2000 år siden, da byen hed Tergeste og var en travl romersk havneby.
+  },
+  { id:4, lat:45.64911, lng:13.77181, walkMin:4,
+    name:{da:"Teatro Romano", en:"Teatro Romano"},
+    intro:{da:"Et rigtigt romersk teater midt i byen – 2000 år gammelt.",
+           en:"A real Roman theatre in the middle of the city – 2,000 years old."},
+    lookFor:{da:["De halvcirkelformede stenrækker, hvor publikum sad","Resterne af scenen nederst","San Giusto-bakken, der rejser sig bag teatret – dér skal vi op senere"],
+             en:["The semicircular stone rows where the audience sat","The remains of the stage at the bottom","San Giusto hill rising behind the theatre – we're heading up there later"]},
+    story:{da:`Kan du se stentrapperne foran dig, formet som en kæmpe halvcirkel? Du står ved Teatro Romano – et ægte romersk teater, bygget for cirka 2000 år siden, da byen hed Tergeste og var en travl romersk havneby.
 Prøv at forestille dig en sommeraften dengang: Op mod 3.500 mennesker sidder tæt på stenrækkerne. Nederst, på scenen, står skuespillere med store, malede masker – glade masker til komedier, triste masker til tragedier. Maskerne gjorde det let at se selv fra bagerste række, om figuren var sjov eller sørgelig. Der var ingen mikrofoner, men teatret er bygget så snedigt, at lyden bar hele vejen op. Dengang lå havet i øvrigt næsten helt herinde – publikum kunne høre bølgerne bag scenen!
 Og nu til den vildeste del af historien: Teatret forsvandt! Gennem århundrederne byggede folk simpelthen huse oven på og rundt om det, og til sidst var det næsten glemt – man kendte det kun fra gamle skrifter. Først i 1938, da man rev nogle gamle bygninger ned, dukkede hele teatret frem igen. Forestil dig at rive et hus ned og finde et helt romersk teater nedenunder!
 Her er en opgave: Hvis du skulle sidde her til forestilling, hvilken række ville du vælge – helt nede foran ved scenen eller højt oppe med udsigt? Om sommeren bruges teatret faktisk stadig til koncerter, præcis som for 2000 år siden.
 Vi bliver i romertiden lidt endnu. Næste stop er en gammel port, gemt i de smalle gyder.`,
-  en:`Can you see the stone steps in front of you, shaped like a giant semicircle? You're standing at the Teatro Romano – a genuine Roman theatre, built around 2,000 years ago, when the city was called Tergeste and was a busy Roman port town.
+    en:`Can you see the stone steps in front of you, shaped like a giant semicircle? You're standing at the Teatro Romano – a genuine Roman theatre, built around 2,000 years ago, when the city was called Tergeste and was a busy Roman port town.
 Try to imagine a summer evening back then: up to 3,500 people sitting close together on the stone rows. Down on the stage, actors wearing big painted masks – happy masks for comedies, sad masks for tragedies. The masks made it easy to see, even from the back row, whether a character was funny or sorrowful. There were no microphones, but the theatre was built so cleverly that the sound carried all the way up. And back then, the sea reached almost all the way in here – the audience could hear the waves behind the stage!
 And now for the wildest part of the story: the theatre disappeared! Over the centuries, people simply built houses on top of it and around it, until it was almost forgotten – known only from old writings. It was only in 1938, when some old buildings were demolished, that the whole theatre emerged again. Imagine tearing down a house and finding an entire Roman theatre underneath!
 Here's a question for you: if you were watching a show here, which row would you choose – right down at the front by the stage, or high up with a view? In summer, the theatre is actually still used for concerts, just as it was 2,000 years ago.
 We're staying in Roman times a little longer. The next stop is an ancient gate, hidden among the narrow alleys.`}
-},
-{ id:5, lat:45.64781, lng:13.76889, walkMin:8,
-  name:{da:"Arco di Riccardo", en:"Arco di Riccardo"},
-  intro:{da:"En romersk byport, klemt inde mellem husene i den gamle bydel.",
-         en:"A Roman city gate, squeezed between the houses of the old town."},
-  lookFor:{da:["De store, slidte stenblokke – over 2000 år gamle","Hvordan husene er bygget helt ind mod buen","De smalle gyder – sådan så hele byen ud i middelalderen"],
-           en:["The great worn stone blocks – over 2,000 years old","How the houses are built right up against the arch","The narrow alleys – this is what the whole city looked like in the Middle Ages"]},
-  story:{da:`Her, midt i en lille hyggelig plads mellem gamle huse, står en kæmpe stenbue: Arco di Riccardo, Richards Bue. Den er over 2000 år gammel og var engang en port i den romerske bymur. Dengang gik man herigennem for at komme ind i byen Tergeste – måske på vej til torvet eller op til templerne på bakken.
+  },
+  { id:5, lat:45.64781, lng:13.76889, walkMin:8,
+    name:{da:"Arco di Riccardo", en:"Arco di Riccardo"},
+    intro:{da:"En romersk byport, klemt inde mellem husene i den gamle bydel.",
+           en:"A Roman city gate, squeezed between the houses of the old town."},
+    lookFor:{da:["De store, slidte stenblokke – over 2000 år gamle","Hvordan husene er bygget helt ind mod buen","De smalle gyder – sådan så hele byen ud i middelalderen"],
+             en:["The great worn stone blocks – over 2,000 years old","How the houses are built right up against the arch","The narrow alleys – this is what the whole city looked like in the Middle Ages"]},
+    story:{da:`Her, midt i en lille hyggelig plads mellem gamle huse, står en kæmpe stenbue: Arco di Riccardo, Richards Bue. Den er over 2000 år gammel og var engang en port i den romerske bymur. Dengang gik man herigennem for at komme ind i byen Tergeste – måske på vej til torvet eller op til templerne på bakken.
 Gå helt hen og læg din hånd forsigtigt på stenen. Tænk over det et øjeblik: Du rører ved noget, som romerske børn, soldater, købmænd og æsler er gået forbi og har rørt ved for to tusind år siden. Er det ikke vildt?
 Men hvorfor hedder den Richards Bue? Her bliver det sjovt, for det er der ingen, der ved med sikkerhed! Et gammelt sagn fortæller, at den engelske konge Richard Løvehjerte blev holdt fanget her i byen, da han var på vej hjem fra korstog – og at buen blev opkaldt efter ham. Historikerne ryster dog på hovedet: Han var nok aldrig i Trieste. Måske kommer navnet i virkeligheden af det latinske ord cardo, som var navnet på hovedgaden i romerske byer. Hvad tror du selv? Kongesagnet er nu meget sjovere, ikke?
 Læg mærke til, hvordan husene gennem århundrederne er bygget helt op ad buen – nogle vægge rører den næsten. Man byggede simpelthen byen videre rundt om det gamle.
 Nu venter turens hårdeste – og flotteste – etape: Vi skal op ad bakken til katedralen. Det stiger et godt stykke, så tag den i roligt tempo. Belønningen på toppen er byens bedste udsigt!`,
-  en:`Here, in the middle of a charming little square among old houses, stands a giant stone arch: the Arco di Riccardo, Richard's Arch. It's over 2,000 years old and was once a gate in the Roman city wall. Back then, you'd pass through it to enter the town of Tergeste – perhaps on your way to the market or up to the temples on the hill.
+    en:`Here, in the middle of a charming little square among old houses, stands a giant stone arch: the Arco di Riccardo, Richard's Arch. It's over 2,000 years old and was once a gate in the Roman city wall. Back then, you'd pass through it to enter the town of Tergeste – perhaps on your way to the market or up to the temples on the hill.
 Walk right up and gently place your hand on the stone. Think about it for a moment: you're touching something that Roman children, soldiers, merchants and donkeys passed by and touched two thousand years ago. Isn't that amazing?
 But why is it called Richard's Arch? This is where it gets fun, because nobody knows for certain! An old legend says that the English king Richard the Lionheart was held captive here in the city on his way home from the Crusades – and that the arch was named after him. Historians shake their heads, though: he probably never came to Trieste. Perhaps the name really comes from the Latin word cardo, which was the name of the main street in Roman towns. What do you think? The king legend is much more fun, isn't it?
 Notice how, over the centuries, the houses have been built right up against the arch – some walls almost touch it. People simply kept building the city around what was already old.
 Now comes the toughest – and most beautiful – stage of the walk: we're heading up the hill to the cathedral. It climbs quite a bit, so take it at an easy pace. The reward at the top is the best view in the city!`}
-},
-{ id:6, lat:45.64654, lng:13.77245, walkMin:10,
-  name:{da:"Cattedrale di San Giusto", en:"Cattedrale di San Giusto"},
-  intro:{da:"Katedralen på bakketoppen – to kirker, der blev til én, og byens bedste udsigt.",
-         en:"The hilltop cathedral – two churches that became one, and the best view in town."},
-  lookFor:{da:["Den store rosenvindue-'blomst' af sten på facaden","Guldmosaikkerne inde i kirken – smid en euro i automaten, så tændes lyset","Udsigten! Kan du finde Molo Audace dernede, hvor vi stod før?"],
-           en:["The big stone rose window 'flower' on the façade","The golden mosaics inside – put a euro in the machine and the lights come on","The view! Can you spot Molo Audace down there, where we stood earlier?"]},
-  story:{da:`Pyha – godt gået, I klarede bakken! Velkommen til toppen af San Giusto-bakken, det allerældste Trieste. Her lå først en keltisk landsby, så romernes templer, og nu: byens katedral.
+  },
+  { id:6, lat:45.64654, lng:13.77245, walkMin:10,
+    name:{da:"Cattedrale di San Giusto", en:"Cattedrale di San Giusto"},
+    intro:{da:"Katedralen på bakketoppen – to kirker, der blev til én, og byens bedste udsigt.",
+           en:"The hilltop cathedral – two churches that became one, and the best view in town."},
+    lookFor:{da:["Den store rosenvindue-'blomst' af sten på facaden","Guldmosaikkerne inde i kirken – smid en euro i automaten, så tændes lyset","Udsigten! Kan du finde Molo Audace dernede, hvor vi stod før?"],
+             en:["The big stone rose window 'flower' on the façade","The golden mosaics inside – put a euro in the machine and the lights come on","The view! Can you spot Molo Audace down there, where we stood earlier?"]},
+    story:{da:`Pyha – godt gået, I klarede bakken! Velkommen til toppen af San Giusto-bakken, det allerældste Trieste. Her lå først en keltisk landsby, så romernes templer, og nu: byens katedral.
 Kig godt på kirkens facade. Kan du se, at den ser lidt … skæv ud? Det er der en god grund til. For omkring 700 år siden lå her to kirker side om side. Så fik man en idé: Hvorfor ikke bygge dem sammen til én stor katedral? Man byggede simpelthen et stykke imellem dem – og derfor er facaden ikke helt symmetrisk. Kirken er bogstaveligt talt to kirker limet sammen!
 Midt på facaden sidder et kæmpe rundt vindue af sten, formet som en blomst med mange blade. Det kaldes et rosenvindue. Går I indenfor, skal I finde de gyldne mosaikker i loftet – billeder lavet af tusindvis af bittesmå guldstumper for over 800 år siden. De glimter magisk, når lyset tændes. Se også efter de romerske gravsten, der er muret ind i klokketårnet – genbrug på den helt gamle måde.
 Ved siden af kirken ligger en rigtig fæstning, Castello di San Giusto, med mure og kanoner.
 Men det bedste heroppe er gratis: udsigten! Gå hen til kanten og find ud af, hvad I kan genkende. Kan du få øje på Molo Audace, hvor vi stod ude over vandet? Og den store Piazza Unità? Hele byen ligger for dine fødder, med de røde tage ned mod det blå hav.
 Når I har nydt udsigten, går vi nedad igen – ned til det sted, hvor Trieste ligner Venedig.`,
-  en:`Phew – well done, you conquered the hill! Welcome to the top of San Giusto hill, the very oldest part of Trieste. First there was a Celtic village here, then the Romans' temples, and now: the city's cathedral.
+    en:`Phew – well done, you conquered the hill! Welcome to the top of San Giusto hill, the very oldest part of Trieste. First there was a Celtic village here, then the Romans' temples, and now: the city's cathedral.
 Take a good look at the church's façade. Can you see that it looks a little… lopsided? There's a good reason for that. Around 700 years ago, two churches stood here side by side. Then someone had an idea: why not join them together into one great cathedral? They simply built a section in between – and that's why the façade isn't quite symmetrical. The church is literally two churches glued together!
 In the middle of the façade sits a huge round stone window, shaped like a flower with many petals. It's called a rose window. If you go inside, look for the golden mosaics in the ceiling – pictures made of thousands of tiny fragments of gold, over 800 years ago. They glitter magically when the lights come on. Also look for the Roman gravestones built into the bell tower – recycling, the truly old-fashioned way.
 Next to the church stands a proper fortress, the Castello di San Giusto, with walls and cannons.
 But the best thing up here is free: the view! Walk to the edge and see what you can recognise. Can you spot Molo Audace, where we stood out over the water? And the great Piazza Unità? The whole city lies at your feet, red rooftops running down to the blue sea.
 Once you've enjoyed the view, we'll head back down – to the place where Trieste looks like Venice.`}
-},
-{ id:7, lat:45.65210, lng:13.77080, walkMin:2,
-  name:{da:"Canal Grande", en:"Canal Grande"},
-  intro:{da:"Kanalen, hvor sejlskibene sejlede lige ind midt i byen.",
-         en:"The canal where sailing ships sailed right into the middle of the city."},
-  lookFor:{da:["Statuen af James Joyce på Ponte Rosso – manden med hat og stok","De blå kupler på den serbisk-ortodokse kirke San Spiridione","Små både, der vugger i kanalen"],
-           en:["The statue of James Joyce on Ponte Rosso – the man with the hat and cane","The blue domes of the Serbian Orthodox church of San Spiridione","Little boats bobbing in the canal"]},
-  story:{da:`Nu er vi nede fra bakken igen – og pludselig ligner Trieste en lille udgave af Venedig! Foran dig ligger Canal Grande, den store kanal, med farverige huse på begge sider og små både, der vugger i vandet.
+  },
+  { id:7, lat:45.65210, lng:13.77080, walkMin:2,
+    name:{da:"Canal Grande", en:"Canal Grande"},
+    intro:{da:"Kanalen, hvor sejlskibene sejlede lige ind midt i byen.",
+           en:"The canal where sailing ships sailed right into the middle of the city."},
+    lookFor:{da:["Statuen af James Joyce på Ponte Rosso – manden med hat og stok","De blå kupler på den serbisk-ortodokse kirke San Spiridione","Små både, der vugger i kanalen"],
+             en:["The statue of James Joyce on Ponte Rosso – the man with the hat and cane","The blue domes of the Serbian Orthodox church of San Spiridione","Little boats bobbing in the canal"]},
+    story:{da:`Nu er vi nede fra bakken igen – og pludselig ligner Trieste en lille udgave af Venedig! Foran dig ligger Canal Grande, den store kanal, med farverige huse på begge sider og små både, der vugger i vandet.
 Kanalen er ikke naturlig. Den blev gravet i 1750'erne, i byens rigeste tid, med ét smart formål: Sejlskibene skulle kunne sejle lige ind i midten af byen og losse deres varer direkte ved købmændenes pakhuse. Forestil dig store sejlskibe her, hvor der nu ligger småbåde – med sække af kaffe, tønder og stofruller, der blev hejst i land, mens folk råbte på alle mulige sprog.
 Gå hen til broen, der hedder Ponte Rosso – Den Røde Bro. Her står en bronzestatue af en tynd mand med hat, briller og stok, midt i sit skridt over broen. Det er James Joyce, den verdensberømte irske forfatter. Han boede over ti år i Trieste, underviste i engelsk og skrev på sine bøger på byens caféer. Han elskede byen. Gå hen og hils på ham – I må gerne give ham hånden, det gør alle!
 Kig så efter en bygning med skinnende blå kupler tæt ved kanalen. Det er San Spiridione, en serbisk-ortodoks kirke. Den minder os om, at Trieste altid har været en blandet by: Her boede italienere, østrigere, grækere, serbere, jøder og mange flere side om side – og det kan man stadig se på byens kirker.
 Vores næste stop står for enden af kanalen og er umulig at overse. Den ligner et græsk tempel!`,
-  en:`We're down from the hill again – and suddenly Trieste looks like a miniature Venice! In front of you lies the Canal Grande, the Grand Canal, with colourful houses on both sides and little boats bobbing in the water.
+    en:`We're down from the hill again – and suddenly Trieste looks like a miniature Venice! In front of you lies the Canal Grande, the Grand Canal, with colourful houses on both sides and little boats bobbing in the water.
 The canal isn't natural. It was dug in the 1750s, during the city's richest era, with one clever purpose: sailing ships would be able to sail right into the centre of the city and unload their goods directly at the merchants' warehouses. Imagine great sailing ships here, where small boats now lie – with sacks of coffee, barrels and rolls of cloth being hoisted ashore while people shouted in all sorts of languages.
 Walk over to the bridge called Ponte Rosso – the Red Bridge. Here stands a bronze statue of a thin man with a hat, glasses and a cane, mid-stride across the bridge. It's James Joyce, the world-famous Irish writer. He lived in Trieste for over ten years, taught English and worked on his books in the city's cafés. He loved this city. Go over and say hello – you're welcome to shake his hand, everyone does!
 Now look for a building with shining blue domes close to the canal. That's San Spiridione, a Serbian Orthodox church. It reminds us that Trieste has always been a mixed city: Italians, Austrians, Greeks, Serbs, Jews and many others lived here side by side – and you can still see it in the city's churches.
 Our next stop stands at the end of the canal and is impossible to miss. It looks like a Greek temple!`}
-},
-{ id:8, lat:45.65160, lng:13.77230, walkMin:3,
-  name:{da:"Chiesa di Sant'Antonio Nuovo", en:"Chiesa di Sant'Antonio Nuovo"},
-  intro:{da:"Byens største kirke – som et græsk tempel for enden af kanalen.",
-         en:"The city's largest church – like a Greek temple at the end of the canal."},
-  lookFor:{da:["De seks kæmpesøjler – tæl selv efter!","Statuerne af helgener øverst oppe på taget","Den flotte spejling af kirken i kanalens vand"],
-           en:["The six giant columns – count them yourself!","The statues of saints up on the roof","The beautiful reflection of the church in the canal"]},
-  story:{da:`Se lige den bygning! For enden af kanalen troner Sant'Antonio Nuovo – Triestes største kirke. Men ligner den egentlig en kirke? Den ligner da nærmere et gammelt græsk tempel, med en trappe op til seks enorme søjler og en stor trekant øverst.
+  },
+  { id:8, lat:45.65160, lng:13.77230, walkMin:3,
+    name:{da:"Chiesa di Sant'Antonio Nuovo", en:"Chiesa di Sant'Antonio Nuovo"},
+    intro:{da:"Byens største kirke – som et græsk tempel for enden af kanalen.",
+           en:"The city's largest church – like a Greek temple at the end of the canal."},
+    lookFor:{da:["De seks kæmpesøjler – tæl selv efter!","Statuerne af helgener øverst oppe på taget","Den flotte spejling af kirken i kanalens vand"],
+             en:["The six giant columns – count them yourself!","The statues of saints up on the roof","The beautiful reflection of the church in the canal"]},
+    story:{da:`Se lige den bygning! For enden af kanalen troner Sant'Antonio Nuovo – Triestes største kirke. Men ligner den egentlig en kirke? Den ligner da nærmere et gammelt græsk tempel, med en trappe op til seks enorme søjler og en stor trekant øverst.
 Prøv at tælle søjlerne: Er der virkelig seks? Og kig så helt op på taget – deroppe står en række statuer af helgener og kigger ud over byen. Bag dem gemmer sig en stor grønlig kuppel.
 Kirken blev bygget færdig i 1849, i en tid hvor man i Europa var helt vilde med alt, der lignede det gamle Grækenland og Rom. Stilen kaldes nyklassicisme – "ny-klassisk" – altså nyt byggeri, der ligner de klassiske, gamle templer. Måske minder den dig om Pantheon i Rom, hvis du har set billeder af det.
 Placeringen er ingen tilfældighed. Kirken står præcis for enden af Canal Grande, så søfolkene kunne se den, allerede når de sejlede ind i kanalen. Efter en lang og farlig sejlads var det første, de mødte i Trieste, en kirke – et sted at sige tak for, at de kom sikkert i havn.
 Her er en sidste opgave ved kanalen: Stil dig, så du kan se kirken spejle sig i vandet. Hvis vandet er stille, får du et perfekt spejlbillede – det er byens mest fotograferede motiv, så tag endelig et billede!
 Og nu: sidste lille etape. Hotellet ligger kun få minutters gang herfra.`,
-  en:`Just look at that building! At the end of the canal stands Sant'Antonio Nuovo – Trieste's largest church. But does it really look like a church? It looks more like an ancient Greek temple, with steps leading up to six enormous columns and a great triangle on top.
+    en:`Just look at that building! At the end of the canal stands Sant'Antonio Nuovo – Trieste's largest church. But does it really look like a church? It looks more like an ancient Greek temple, with steps leading up to six enormous columns and a great triangle on top.
 Try counting the columns: are there really six? And look right up at the roof – up there, a row of statues of saints gazes out over the city. Behind them hides a large greenish dome.
 The church was completed in 1849, at a time when Europe was crazy about anything resembling ancient Greece and Rome. The style is called neoclassicism – "new classical" – new buildings that look like the classical old temples. It might remind you of the Pantheon in Rome, if you've seen pictures of it.
 The location is no coincidence. The church stands exactly at the end of the Canal Grande, so sailors could see it as soon as they sailed into the canal. After a long and dangerous voyage, the first thing they met in Trieste was a church – a place to give thanks for arriving safely in port.
 Here's one last challenge by the canal: position yourself so you can see the church reflected in the water. If the water is still, you'll get a perfect mirror image – it's the most photographed view in the city, so do take a picture!
 And now: the final little stretch. The hotel is only a few minutes' walk from here.`}
-},
-{ id:9, lat:45.64998, lng:13.77299, walkMin:0,
-  name:{da:"Tilbage til The Modernist Hotel", en:"Back to The Modernist Hotel"},
-  intro:{da:"Turen slutter, hvor den begyndte – tillykke, I klarede hele ruten!",
-         en:"The walk ends where it began – congratulations, you completed the whole route!"},
-  lookFor:{da:["En café til en velfortjent kaffe eller kakao","En gelateria – I har fortjent en is!","Byen med nye øjne: Hvor mange steder fra turen kan I huske?"],
-           en:["A café for a well-earned coffee or hot chocolate","A gelateria – you've earned an ice cream!","The city with fresh eyes: how many places from the walk can you remember?"]},
-  story:{da:`Og så er vi tilbage, hvor vi startede – foran The Modernist Hotel. Tillykke! I har gået hele vejen gennem to tusind års historie.
+  },
+  { id:9, lat:45.64998, lng:13.77299, walkMin:0,
+    name:{da:"Tilbage til The Modernist Hotel", en:"Back to The Modernist Hotel"},
+    intro:{da:"Turen slutter, hvor den begyndte – tillykke, I klarede hele ruten!",
+           en:"The walk ends where it began – congratulations, you completed the whole route!"},
+    lookFor:{da:["En café til en velfortjent kaffe eller kakao","En gelateria – I har fortjent en is!","Byen med nye øjne: Hvor mange steder fra turen kan I huske?"],
+             en:["A café for a well-earned coffee or hot chocolate","A gelateria – you've earned an ice cream!","The city with fresh eyes: how many places from the walk can you remember?"]},
+    story:{da:`Og så er vi tilbage, hvor vi startede – foran The Modernist Hotel. Tillykke! I har gået hele vejen gennem to tusind års historie.
 Tænk lige over, hvad I har set i dag: en børs, der ligner et tempel. Europas største plads ud mod havet, hvor to bronzefigurer slår timeslag. En mole bygget oven på et sunket skib. Et romersk teater, der lå gemt under husene i hundredvis af år. En 2000 år gammel port, som måske – måske ikke – har noget med en engelsk konge at gøre. En katedral lavet af to kirker, med guldmosaikker og byens bedste udsigt. En kanal, hvor sejlskibene sejlede lige ind i byen, med James Joyce på broen. Og et græsk tempel, der i virkeligheden er en kirke.
 Her er turens allersidste spørgsmål: Hvilket stop var din favorit? Og hvis du skulle vise ét sted frem for en ven, hvilket skulle det så være?
 I har nu i den grad fortjent en belønning. Trieste er Italiens kaffehovedstad, så de voksne bør prøve en rigtig triestinsk kaffe – bestil en "nero", hvis du vil have espresso som de lokale. Og til alle, store som små: Find en gelateria og vælg netop dén is, I har drømt om undervejs. Det er en ordre fra jeres guide!
 Tak, fordi I gik med. Trieste siger arrivederci – på gensyn. Og hvem ved: Måske blæser boraen jer tilbage hertil en dag.`,
-  en:`And here we are, back where we started – in front of The Modernist Hotel. Congratulations! You've walked all the way through two thousand years of history.
+    en:`And here we are, back where we started – in front of The Modernist Hotel. Congratulations! You've walked all the way through two thousand years of history.
 Just think about what you've seen today: a stock exchange that looks like a temple. Europe's largest seafront square, where two bronze figures strike the hours. A pier built on top of a sunken ship. A Roman theatre that lay hidden beneath the houses for hundreds of years. A 2,000-year-old gate that may – or may not – have something to do with an English king. A cathedral made of two churches, with golden mosaics and the best view in town. A canal where sailing ships sailed right into the city, with James Joyce on the bridge. And a Greek temple that's really a church.
 Here's the very last question of the walk: which stop was your favourite? And if you had to show one place to a friend, which would it be?
 You've thoroughly earned a reward. Trieste is Italy's coffee capital, so the grown-ups should try a proper Triestine coffee – order a "nero" if you want espresso like the locals. And for everyone, big and small: find a gelateria and choose exactly the ice cream you've been dreaming about along the way. That's an order from your guide!
 Thank you for walking along. Trieste says arrivederci – see you again. And who knows: perhaps the Bora will blow you back here one day.`}
-}
-];
+  }
+]},
+
+/* ------------------- RHODOS' GAMLE BY ---------------------- */
+rhodos:{
+  title:{da:"Rhodos City Walk", en:"Rhodes City Walk"},
+  cityName:{da:"Rhodos", en:"Rhodes"},
+  center:[36.4446,28.2266], zoom:16,
+  summary:{da:"10 stop · ca. 2,5 km · ca. 31 min ren gåtid (2–3 timer med stop).",
+           en:"10 stops · approx. 2.5 km · about 31 min of pure walking (2–3 hours with stops)."},
+  about:{da:"Ca. 2,5 km til fods gennem Rhodos' middelalderlige gamle by – på UNESCOs verdensarvsliste og en af Europas bedst bevarede middelalderbyer. Regn med 2–3 timer med stop. Turen starter og slutter ved Eleftherias-porten ved Mandraki-havnen. God tur!",
+         en:"Approx. 2.5 km on foot through the medieval old town of Rhodes – a UNESCO World Heritage Site and one of Europe's best-preserved medieval towns. Allow 2–3 hours with stops. The tour starts and ends at Eleftherias Gate by Mandraki harbour. Enjoy!"},
+  stops:[
+  { id:0, lat:36.44660, lng:28.22630, walkMin:3,
+    name:{da:"Eleftherias-porten", en:"Eleftherias Gate"},
+    intro:{da:"Hovedindgangen fra Mandraki-havnen – og stedet, hvor et af verdens syv vidundere måske stod.",
+           en:"The main entrance from Mandraki harbour – and the spot where one of the Seven Wonders may have stood."},
+    lookFor:{da:["De to hjortestatuer på søjlerne ude ved havneindsejlingen","De tykke bymure – prøv at gætte, hvor tykke de er","Vindmøllerne og fortet Agios Nikolaos ude på molen"],
+             en:["The two deer statues on columns at the harbour entrance","The massive town walls – try guessing how thick they are","The windmills and the fortress of Agios Nikolaos out on the pier"]},
+    story:{da:`Velkommen til Rhodos – og til en af Europas allerbedst bevarede middelalderbyer! Vi står ved Eleftherias-porten, Frihedens Port, hovedindgangen til den gamle by. Bag os ligger Mandraki-havnen, og foran os venter fire kilometer bymur med riddere, sultaner og tusind års historie.
+Men før vi går ind, skal I høre om noget, der ikke er her længere – og som alligevel er det mest berømte ved Rhodos. Kig ud mod havneindsejlingen, hvor to søjler med en hjort og en hind står i dag. Her, eller et sted meget tæt på, stod for over 2200 år siden Kolossen på Rhodos: en kæmpestatue af solguden Helios, lavet af bronze og omkring 33 meter høj. Det er lige så højt som et hus med ti etager! Den var et af verdens syv vidundere.
+Kolossen stod dog kun i cirka 66 år. Så kom et voldsomt jordskælv, og den knækkede ved knæene og styrtede om. I over 800 år lå den væltet på jorden – og folk rejste stadig langvejsfra bare for at se resterne. Til sidst blev bronzen solgt som skrot, og legenden siger, at der skulle 900 kameler til at bære det hele væk!
+Prøv at forestille dig: Hvordan mon det så ud, når man sejlede ind i havnen, og en 33 meter høj, skinnende bronzemand tog imod?
+Nu går vi ind gennem porten – og direkte ind i riddernes by.`,
+    en:`Welcome to Rhodes – and to one of the very best-preserved medieval towns in Europe! We're standing at Eleftherias Gate, the Gate of Liberty, the main entrance to the old town. Behind us lies Mandraki harbour, and ahead of us wait four kilometres of town walls filled with knights, sultans and a thousand years of history.
+But before we go in, you need to hear about something that isn't here any more – and yet is the most famous thing about Rhodes. Look out towards the harbour entrance, where two columns topped with a stag and a doe stand today. Here, or somewhere very close by, stood – more than 2,200 years ago – the Colossus of Rhodes: a giant statue of the sun god Helios, made of bronze and about 33 metres tall. That's as tall as a ten-storey building! It was one of the Seven Wonders of the World.
+The Colossus only stood for about 66 years, though. Then a violent earthquake struck, and it snapped at the knees and crashed down. For over 800 years it lay toppled on the ground – and people still travelled from far away just to see the remains. In the end, the bronze was sold as scrap, and legend says it took 900 camels to carry it all away!
+Try to imagine: what must it have looked like, sailing into the harbour with a 33-metre shining bronze man welcoming you?
+Now let's walk through the gate – straight into the city of the knights.`}
+  },
+  { id:1, lat:36.44477, lng:28.22717, walkMin:2,
+    name:{da:"Ridderhospitalet (Arkæologisk Museum)", en:"Knights' Hospital (Archaeological Museum)"},
+    intro:{da:"Riddernes store hospital fra 1400-tallet – i dag byens arkæologiske museum.",
+           en:"The knights' great 15th-century hospital – today the city's archaeological museum."},
+    lookFor:{da:["Den store buede portindgang med våbenskjolde over","Pyramiderne af stenkanonkugler i gården","Kattene! Den gamle by er fuld af dem, og alle passer på dem"],
+             en:["The great arched entrance with coats of arms above","The pyramids of stone cannonballs in the courtyard","The cats! The old town is full of them, and everyone looks after them"]},
+    story:{da:`Den store stenbygning her er Ridderhospitalet, og den fortæller, hvem ridderne på Rhodos egentlig var. For de var noget helt særligt: Johanniterridderne var nemlig munke, soldater og sygeplejere – på én gang!
+Ordenen blev grundlagt for at passe syge pilgrimme, altså mennesker på lange rejser til det hellige land. Da ridderne kom til Rhodos i 1309, byggede de denne kæmpemæssige bygning som deres hospital. Ovenpå lå en enorm sygesal med plads til omkring hundrede senge. Her blev syge og sårede plejet – og det var lige meget, hvor de kom fra, og hvilket sprog de talte. Ridderne kaldte patienterne "vores herrer, de syge". Tænk engang: De hårde krigere i rustning bøjede sig og serverede maden på sølvfade, fordi de mente, at de syge var de fineste af alle.
+I dag er hospitalet Arkæologisk Museum. Går I ind, kan I se skatte fra det gamle Grækenland, blandt andet den berømte statue af gudinden Afrodite, der sidder og ordner sit hår. Og gården er fuld af stenkanonkugler stablet i pyramider – dem vender vi tilbage til, for de har været brugt!
+Her er en opgave, mens vi går videre: Hold øje med byens katte. Rhodos' gamle by er berømt for sine mange katte, og hele byen hjælper med at fodre dem. Hvor mange kan du nå at tælle inden næste stop?
+Og næste stop er noget helt særligt: den flotteste middelaldergade i hele Europa.`,
+    en:`This great stone building is the Knights' Hospital, and it tells you who the knights of Rhodes really were. Because they were something quite special: the Knights of St John were monks, soldiers and nurses – all at once!
+The order was founded to care for sick pilgrims – people on long journeys to the Holy Land. When the knights came to Rhodes in 1309, they built this enormous building as their hospital. Upstairs was a vast infirmary ward with room for around a hundred beds. The sick and wounded were cared for here – no matter where they came from or what language they spoke. The knights called their patients "our lords, the sick". Just imagine: hardened warriors in armour bowing and serving food on silver plates, because they believed the sick were the noblest of all.
+Today, the hospital is the Archaeological Museum. If you go inside, you can see treasures from ancient Greece, including the famous statue of the goddess Aphrodite arranging her hair. And the courtyard is full of stone cannonballs stacked in pyramids – we'll come back to those, because they have been used!
+Here's a challenge as we walk on: keep an eye out for the town's cats. The old town of Rhodes is famous for its many cats, and the whole town helps feed them. How many can you count before the next stop?
+And the next stop is something very special: the finest medieval street in all of Europe.`}
+  },
+  { id:2, lat:36.44505, lng:28.22683, walkMin:5,
+    name:{da:"Riddernes Gade", en:"Street of the Knights"},
+    intro:{da:"Europas bedst bevarede middelaldergade – riddernes egen gade.",
+           en:"Europe's best-preserved medieval street – the knights' own street."},
+    lookFor:{da:["Våbenskjoldene i sten over dørene – find dit yndlingsskjold","De runde brosten – mærk, hvor ujævne de er","De buede stenbroer mellem husene højt oppe"],
+             en:["The stone coats of arms above the doors – find your favourite","The rounded cobblestones – feel how uneven they are","The arched stone bridges between the houses high above"]},
+    story:{da:`Nu går vi op ad Riddernes Gade – og hold godt fast i øjnene, for sådan her så en gade ud for 500 år siden! Ingen skilte, ingen ledninger, kun brosten og gyldne stenhuse. Det er en af de bedst bevarede middelaldergader i hele verden.
+Her boede ridderne. Men de boede ikke bare mellem hinanden. Johanniterridderne kom fra hele Europa, og de blev delt op efter sprog – man kaldte det "tunger". Der var en tunge for Frankrig, en for Italien, en for Spanien, en for England, en for Tyskland og flere til. Hver tunge havde sit eget hus her i gaden, et såkaldt herberg, hvor ridderne spiste, holdt møder og boede.
+Og nu kommer opgaven: Kig op over dørene og portene! Der sidder våbenskjolde hugget i sten – riddernes og stormestrenes mærker med løver, liljer, kors og striber. Prøv at finde så mange som muligt. Hvilket skjold er det flotteste? Hvis du selv skulle designe et våbenskjold, hvad skulle der så være på det?
+Prøv også at lukke øjnene et øjeblik og lytte. Kan du høre hestehove på brostenene? Raslende rustninger? For 500 år siden var gaden fuld af riddere i kapper med det hvide johanniterkors, tjenere med kurve og heste på vej op til paladset.
+Og det er præcis derhen, vi skal nu: op til toppen af gaden, hvor riddernes mægtige chef boede – Stormesteren.`,
+    en:`Now we're walking up the Street of the Knights – and keep your eyes wide open, because this is what a street looked like 500 years ago! No signs, no cables, just cobblestones and golden stone houses. It's one of the best-preserved medieval streets in the entire world.
+This is where the knights lived. But they didn't just live all mixed together. The Knights of St John came from all over Europe, and they were divided by language – into what were called "tongues". There was a tongue of France, one of Italy, one of Spain, one of England, one of Germany, and more. Each tongue had its own house on this street, called an inn, where the knights ate, held meetings and lived.
+And now for your challenge: look up above the doors and gateways! There are coats of arms carved in stone – the emblems of knights and grand masters, with lions, lilies, crosses and stripes. Try to find as many as you can. Which one is the finest? And if you designed your own coat of arms, what would be on it?
+Also try closing your eyes for a moment and listening. Can you hear horses' hooves on the cobblestones? Rattling armour? Five hundred years ago, this street was full of knights in cloaks bearing the white cross of St John, servants with baskets, and horses heading up to the palace.
+And that's exactly where we're going now: to the top of the street, where the knights' mighty leader lived – the Grand Master.`}
+  },
+  { id:3, lat:36.44542, lng:28.22420, walkMin:3,
+    name:{da:"Stormesterens Palads", en:"Palace of the Grand Master"},
+    intro:{da:"Riddernes fæstning i fæstningen – med tårne, vindebro og en vild historie.",
+           en:"The knights' fortress within the fortress – with towers, a drawbridge and a wild story."},
+    lookFor:{da:["De to runde tårne ved indgangen – som et rigtigt eventyrslot","De takkede murkroner, man kunne gemme sig bag","Vagternes skydeskår – smalle sprækker til pile og kanoner"],
+             en:["The two round towers at the entrance – like a proper fairy-tale castle","The battlements you could hide behind","The guards' arrow slits – narrow openings for arrows and cannons"]},
+    story:{da:`Se lige det slot! Stormesterens Palads er en fæstning inde i fæstningen – hvis fjenden brød gennem bymuren, kunne ridderne trække sig tilbage hertil og kæmpe videre. Her boede Stormesteren, riddernes øverste chef, der blev valgt for livstid. Han var nærmest en konge.
+Paladset har oplevet lidt af hvert. I 1522 kom sultan Süleyman den Store med en gigantisk hær – over hundrede tusind soldater og hundredvis af skibe – for at erobre Rhodos. Ridderne var kun få tusind, men de kæmpede bag murene i næsten seks måneder! Sultanen blev så imponeret over deres mod, at han til sidst tilbød dem en aftale: Overgiv byen, og I må frit sejle væk med æren i behold. Ridderne sagde ja og sejlede til Malta. Kanonkuglerne fra netop dén belejring ligger stadig stablet rundt om i byen!
+Og så skete der noget vildt i 1856: Et lyn slog ned, og et glemt lager af krudt i en kælder tæt på eksploderede med et brag, der ødelagde store dele af paladset. I mange år lå det i ruiner. Det, I ser i dag, blev genopbygget af italienerne i 1930'erne som feriepalads for deres konge – men han kom her aldrig!
+Går I indenfor, venter der flotte sale med mosaikgulve, som er over 1700 år gamle.
+Her er et spørgsmål, mens vi går videre: Hvis du var stormester og måtte bestemme alt – hvad ville din første lov være?
+Nu skal vi møde dem, der overtog byen efter ridderne: sultanens folk.`,
+    en:`Just look at that castle! The Palace of the Grand Master is a fortress within the fortress – if the enemy broke through the town walls, the knights could retreat here and keep fighting. This is where the Grand Master lived, the knights' supreme leader, elected for life. He was practically a king.
+The palace has been through quite a lot. In 1522, Sultan Suleiman the Magnificent arrived with a gigantic army – over a hundred thousand soldiers and hundreds of ships – to conquer Rhodes. The knights numbered only a few thousand, but they fought behind these walls for almost six months! The Sultan was so impressed by their courage that he finally offered them a deal: surrender the city, and you may sail away freely with your honour intact. The knights accepted and sailed to Malta. The cannonballs from that very siege still lie stacked around the town!
+And then something wild happened in 1856: lightning struck, and a forgotten store of gunpowder in a nearby cellar exploded with a blast that destroyed large parts of the palace. For many years it lay in ruins. What you see today was rebuilt by the Italians in the 1930s as a holiday palace for their king – but he never came!
+If you go inside, grand halls await, with mosaic floors more than 1,700 years old.
+Here's a question as we walk on: if you were Grand Master and could decide everything – what would your first law be?
+Now we're going to meet the people who took over the city after the knights: the Sultan's men.`}
+  },
+  { id:4, lat:36.44402, lng:28.22427, walkMin:2,
+    name:{da:"Süleyman-moskeen & Uret-tårnet", en:"Süleymaniye Mosque & Clock Tower"},
+    intro:{da:"Den lyserøde moské fra sultanens tid – og tårnet med byens bedste udsigt.",
+           en:"The pink mosque from the Sultan's era – and the tower with the best view in town."},
+    lookFor:{da:["Moskeens lyserøde farve – hvor mange lyserøde bygninger har du set før?","Den høje, slanke minaret ved siden af","Uret-tårnet – kan du se, hvad klokken er?"],
+             en:["The mosque's pink colour – how many pink buildings have you seen before?","The tall, slender minaret beside it","The Clock Tower – can you tell what time it is?"]},
+    story:{da:`Kan du se den store lyserøde bygning? Det er Süleyman-moskeen – og den fortæller om et helt nyt kapitel i byens historie. For da ridderne sejlede væk i 1522, blev Rhodos en del af Osmannerriget, sultanens kæmpe rige, og sådan var det i næsten 400 år!
+Moskeen blev bygget til ære for sultan Süleyman, som havde erobret øen, og den har fået sin fine rosafarve fra murværket. Ved siden af rejser minareten sig, det slanke tårn, hvorfra der blev kaldt til bøn fem gange om dagen. Byen forandrede sig i de år: Kirker blev til moskeer, der kom tyrkiske bade, springvand og nye dufte af krydderier i gaderne. Rhodos blev en by, hvor øst og vest mødtes – og det kan man stadig smage, dufte og se i dag.
+Lige heromkring står også det gamle Uret-tårn, Roloi. Det er byens højeste punkt, man kan komme op i, og fra toppen kan man se ud over alle den gamle bys tage, kupler og minareter – og helt ud til havet. Hvis I har tid og lyst, er det et rigtig godt sted at gå op (og der plejer at følge en drink med i billetten til de voksne!).
+Her er en tænkeopgave: I den samme by har der nu boet grækere, riddere fra hele Europa, tyrkere og mange andre. Hvad tror du, børnene dengang legede sammen på tværs af sprogene?
+Nu går vi ned ad bakken – lige ud i byens travleste handelsgade, hvor der har været købt og solgt i mange hundrede år.`,
+    en:`Can you see the big pink building? That's the Süleymaniye Mosque – and it tells of a whole new chapter in the city's history. Because when the knights sailed away in 1522, Rhodes became part of the Ottoman Empire, the Sultan's vast realm – and so it remained for almost 400 years!
+The mosque was built in honour of Sultan Suleiman, who had conquered the island, and it gets its lovely rosy colour from the stonework. Beside it rises the minaret, the slender tower from which the call to prayer sounded five times a day. The city changed in those years: churches became mosques, Turkish baths appeared, along with fountains and new scents of spices in the streets. Rhodes became a city where East met West – and you can still taste, smell and see it today.
+Right around here also stands the old Clock Tower, the Roloi. It's the highest point in town that you can climb, and from the top you can see across all the rooftops, domes and minarets of the old town – and out to the sea. If you have the time, it's well worth going up (and a drink for the grown-ups is usually included in the ticket!).
+Here's something to think about: this same city has been home to Greeks, knights from all over Europe, Turks and many others. What games do you think the children back then played together across all those languages?
+Now we're heading downhill – straight into the town's busiest shopping street, where buying and selling has gone on for many hundreds of years.`}
+  },
+  { id:5, lat:36.44408, lng:28.22544, walkMin:4,
+    name:{da:"Sokratous – bazargaden", en:"Sokratous – the Bazaar Street"},
+    intro:{da:"Byens gamle handelsgade – bazar dengang, butiksgade i dag.",
+           en:"The town's old trading street – a bazaar then, a shopping street today."},
+    lookFor:{da:["Butikker med svampe, sæber og olivenolie – Rhodos' klassikere","Gamle osmanniske facader med små karnapper over gaden","Endnu flere katte – er din optælling stadig i gang?"],
+             en:["Shops with sponges, soaps and olive oil – Rhodes classics","Old Ottoman façades with little bay windows above the street","Even more cats – is your count still going?"]},
+    story:{da:`Velkommen til Sokratous-gaden – byens store handelsgade i mange hundrede år. I osmannertiden var det her, bazaren lå: boder og små butikker side om side, købmænd der råbte deres priser, duften af kaffe, læder og krydderier, og folk fra hele Middelhavet der pruttede om priserne på alle mulige sprog.
+Og ved du hvad? Det er faktisk ikke så forskelligt i dag! Gaden er stadig fuld af butikker og mennesker fra hele verden. Varerne har bare skiftet: I dag sælger man badesvampe fra havet, olivenolie, sæber, smykker og is. Naturlige badesvampe var i øvrigt en af Rhodos' store skatte i gamle dage – dykkere hentede dem op fra havbunden uden iltflasker, på én enkelt indånding!
+Prøv en lille leg, mens I går: Forestil jer, at I er købmænd for 300 år siden. Hvad ville I sælge i jeres bod? Og hvad ville I råbe for at lokke kunder til? I må gerne øve jer – bare ikke alt for højt!
+Læg også mærke til husene over butikkerne. Flere steder ses de gamle osmanniske trækarnapper, små lukkede altaner, der hænger ud over gaden. Derfra kunne familierne kigge ned på al handlen uden selv at blive set.
+Og så en vigtig ting for jeres kat-optælling: Sokratous er et af kattenes yndlingssteder, for her falder der altid lidt mad af. Hvad er tallet oppe på nu?
+Næste stop ligger for enden af gaden: en plads med et springvand, hvor der sidder en lille overraskelse på toppen.`,
+    en:`Welcome to Sokratous Street – the town's great trading street for many hundreds of years. In Ottoman times, this is where the bazaar was: stalls and little shops side by side, merchants shouting their prices, the scent of coffee, leather and spices, and people from all over the Mediterranean haggling in every language imaginable.
+And you know what? It's actually not so different today! The street is still full of shops and people from all over the world. Only the goods have changed: today they sell sea sponges, olive oil, soaps, jewellery and ice cream. Natural sea sponges, by the way, were one of Rhodes' great treasures in the old days – divers fetched them from the seabed without oxygen tanks, on a single breath!
+Try a little game as you walk: imagine you're merchants 300 years ago. What would you sell at your stall? And what would you shout to attract customers? Feel free to practise – just not too loudly!
+Also notice the houses above the shops. In several places you can see the old Ottoman wooden bay windows – small enclosed balconies hanging out over the street. From there, families could watch all the trading below without being seen themselves.
+And an important note for your cat count: Sokratous is one of the cats' favourite spots, because a little food always falls their way here. What's your total now?
+The next stop lies at the end of the street: a square with a fountain – and a little surprise sitting on top of it.`}
+  },
+  { id:6, lat:36.44365, lng:28.22829, walkMin:1,
+    name:{da:"Hippokrates-pladsen", en:"Hippocrates Square"},
+    intro:{da:"Byens mødested med uglefontænen og det gamle handelsret-hus.",
+           en:"The town's meeting place, with the owl fountain and the old merchants' court."},
+    lookFor:{da:["Uglen på toppen af fontænen – fandt du den?","Kastellania-bygningen med den store udvendige trappe","Aftenlivet – pladsen er byens dagligstue"],
+             en:["The owl on top of the fountain – did you spot it?","The Kastellania building with its grand outdoor staircase","The evening buzz – this square is the town's living room"]},
+    story:{da:`Her er den – Hippokrates-pladsen, den gamle bys hjerte og mødested. Her mødes gaderne, her mødes folk, og her har byens liv summet i århundreder.
+Midt på pladsen står en fontæne, og nu kommer dagens finde-opgave: Kig helt op på toppen af den. Kan du se, hvem der sidder deroppe? Rigtigt – en lille ugle! I det gamle Grækenland var uglen visdommens fugl og fulgte gudinden Athene overalt. En ugle på toppen af fontænen er altså en lille hilsen fra det gamle Grækenland midt i middelalderbyen. Sig godaw til den!
+Den flotte bygning med den store udvendige trappe hedder Kastellania og er bygget af ridderne omkring år 1507. Det var byens handelsret – en slags domstol for købmænd. Hvis to handelsmænd blev uenige om en pris, en last varer eller et beskadiget skib, gik de herop, og så afgjorde dommerne sagen. Smart at have retten liggende lige ved bazargaden, ikke?
+Pladsen er også et godt sted at holde en lille pause. Om aftenen fyldes den af mennesker, musik og lys – det er den gamle bys dagligstue. Måske er det her, I skal spise til aften?
+Læg mærke til, hvor tæt alting ligger: Vi er kun få skridt fra vores næste stop, byens flotteste port. Den vender ud mod havet, og i gamle dage var den det allerførste, søfolkene så, når de kom i land. Kom, den skal ses!`,
+    en:`Here it is – Hippocrates Square, the heart and meeting place of the old town. Streets meet here, people meet here, and the town's life has buzzed here for centuries.
+In the middle of the square stands a fountain, and now for today's spotting challenge: look right up at the top of it. Can you see who's sitting up there? That's right – a little owl! In ancient Greece, the owl was the bird of wisdom and followed the goddess Athena everywhere. An owl on top of the fountain is a little greeting from ancient Greece in the middle of the medieval town. Say hello to it!
+The handsome building with the grand outdoor staircase is called the Kastellania, built by the knights around 1507. It was the town's merchant court – a kind of tribunal for traders. If two merchants disagreed about a price, a cargo of goods or a damaged ship, they came up here and the judges settled the matter. Clever to have the court right next to the bazaar street, wasn't it?
+The square is also a good spot for a little break. In the evening it fills with people, music and light – it's the old town's living room. Perhaps this is where you'll have dinner tonight?
+Notice how close everything is: we're only a few steps from our next stop, the town's most magnificent gate. It faces the sea, and in the old days it was the very first thing sailors saw when they came ashore. Come on – you have to see it!`}
+  },
+  { id:7, lat:36.44408, lng:28.22828, walkMin:3,
+    name:{da:"Marineporten", en:"The Sea Gate"},
+    intro:{da:"Byens flotteste port med to mægtige tårne – søfolkenes indgang.",
+           en:"The town's grandest gate with two mighty towers – the sailors' entrance."},
+    lookFor:{da:["De to store runde tårne – som i en ridderfilm","Relieffet over porten med figurer hugget i sten","Murens tykkelse, når du går igennem – tæl dine skridt!"],
+             en:["The two great round towers – straight out of a knight film","The relief above the gate with figures carved in stone","The thickness of the wall as you pass through – count your steps!"]},
+    story:{da:`Sikke en port! Marineporten – Søporten – er den flotteste af alle den gamle bys porte, med to mægtige runde tårne, der ser ud som noget fra en ridderfilm. Den blev bygget af ridderne i 1478, og den vender ud mod havnen.
+Tænk på, hvad den her port har betydet: I hundredvis af år var den byens hoveddør fra havet. Når et skib lagde til efter uger eller måneder på vandet, var det her, søfolkene gik i land. Trætte, saltvandsdrivende og med ben, der stadig vippede efter bølgerne, gik de gennem porten – og så stod de midt i en summende by med boder, værtshuse og mennesker fra hele verden.
+Kig op over portåbningen. Kan du se relieffet, billedet hugget i sten? Det viser jomfru Maria med barnet mellem to helgener – riddernes beskyttere. De skulle våge over alle, der gik ind og ud. Og rundt om dem: våbenskjolde, selvfølgelig. Dem er du jo ekspert i at spotte nu!
+Her kommer en opgave: Når du går gennem porten, så tæl dine skridt. Hvor mange skridt tager det at komme gennem muren? Det siger noget om, hvor tyk den er – og hvorfor sultanens hær havde så svært ved at komme igennem!
+Prøv også at lege vagt et øjeblik: Stil dig ved porten og beslut med et strengt blik, hvem der må komme ind. Husk at være flink ved kattene.
+Nu går vi ind i byen igen – til et kvarter med en stille plads, et søhestespringvand og en historie, vi skal huske sammen.`,
+    en:`What a gate! The Sea Gate is the grandest of all the old town's gates, with two mighty round towers that look like something from a knight film. It was built by the knights in 1478, and it faces the harbour.
+Think about what this gate has meant: for hundreds of years, it was the town's front door from the sea. When a ship docked after weeks or months on the water, this is where the sailors came ashore. Tired, salt-soaked, their legs still swaying with the waves, they walked through this gate – and found themselves in a buzzing town of stalls, taverns and people from all over the world.
+Look up above the gateway. Can you see the relief, the picture carved in stone? It shows the Virgin Mary with the child between two saints – the knights' protectors. They were to watch over everyone passing in and out. And around them: coats of arms, of course. You're an expert at spotting those by now!
+Here's a challenge: as you walk through the gate, count your steps. How many steps does it take to get through the wall? That tells you how thick it is – and why the Sultan's army had such trouble getting through!
+Also try playing guard for a moment: stand by the gate and decide, with your sternest look, who may enter. Remember to be kind to the cats.
+Now we're heading back into the town – to a quarter with a quiet square, a seahorse fountain, and a story we should remember together.`}
+  },
+  { id:8, lat:36.44276, lng:28.22968, walkMin:8,
+    name:{da:"Det jødiske kvarter & Martyrernes Plads", en:"The Jewish Quarter & Martyrs' Square"},
+    intro:{da:"Den stille plads med søhestefontænen – og et sted, byen aldrig glemmer.",
+           en:"The quiet square with the seahorse fountain – and a place the town never forgets."},
+    lookFor:{da:["Søhestene på fontænen midt på pladsen","Det sorte mindesmærke med tekst på mange sprog","De stille sidegader – her boede familierne i århundreder"],
+             en:["The seahorses on the fountain in the middle of the square","The black memorial with text in many languages","The quiet side streets – families lived here for centuries"]},
+    story:{da:`Nu er vi kommet til en lidt stillere del af byen: det gamle jødiske kvarter, som på det lokale sprog blev kaldt La Juderia. Midt på pladsen står en fin fontæne med tre søheste – dem skal I hilse på først. Søhestene er blevet et vartegn for kvarteret.
+Her har jødiske familier boet i over to tusind år – længere end både ridderne og sultanerne var her! De var købmænd, håndværkere og naboer, og deres synagoge, Kahal Shalom fra 1577, ligger stadig i en sidegade tæt herpå. Den er den ældste synagoge i hele Grækenland, og man kan besøge den i dag.
+Pladsen her hedder Martyrernes Plads, og navnet bærer på en trist historie, som byen har lovet aldrig at glemme. Under Anden Verdenskrig, i sommeren 1944, blev over 1.600 af kvarterets beboere – bedsteforældre, forældre og børn – ført væk af tyske soldater, og de allerfleste kom aldrig hjem igen. Det sorte mindesmærke på pladsen minder om dem, med den samme tekst på mange sprog: Glem aldrig.
+Man kan godt blive lidt stille af sådan en historie, og det er helt i orden. Når vi husker de mennesker, der boede her, er de ikke helt væk. Så lad os gøre netop det: Stå et øjeblik ved fontænen og tænk på, at her har børn leget, handlet og haft travlt i over to tusind år.
+Og livet i kvarteret fortsætter – med caféer, blomster og katte i gaderne. Nu går vi det sidste stykke, tilbage mod porten hvor vi startede.`,
+    en:`We've now come to a somewhat quieter part of town: the old Jewish quarter, known in the local language as La Juderia. In the middle of the square stands a lovely fountain with three seahorses – go and say hello to them first. The seahorses have become a symbol of the quarter.
+Jewish families lived here for over two thousand years – longer than either the knights or the sultans were here! They were merchants, craftsmen and neighbours, and their synagogue, Kahal Shalom from 1577, still stands in a side street close by. It's the oldest synagogue in all of Greece, and you can visit it today.
+This square is called the Square of the Jewish Martyrs, and the name carries a sad story that the town has promised never to forget. During the Second World War, in the summer of 1944, more than 1,600 of the quarter's residents – grandparents, parents and children – were taken away by German soldiers, and very few ever came home again. The black memorial on the square remembers them, with the same words in many languages: Never forget.
+A story like that can make you go a little quiet, and that's perfectly all right. When we remember the people who lived here, they are not entirely gone. So let's do exactly that: stand by the fountain for a moment and think about how children played, traded and bustled about here for more than two thousand years.
+And life in the quarter goes on – with cafés, flowers and cats in the streets. Now we'll walk the last stretch, back towards the gate where we started.`}
+  },
+  { id:9, lat:36.44660, lng:28.22630, walkMin:0,
+    name:{da:"Tilbage til Eleftherias-porten", en:"Back to Eleftherias Gate"},
+    intro:{da:"Turen slutter ved porten – tillykke, I har erobret riddernes by!",
+           en:"The walk ends at the gate – congratulations, you've conquered the knights' town!"},
+    lookFor:{da:["Voldgraven – den tørre grav rundt om muren er i dag en grøn park","En gelateria eller en græsk café – I har fortjent det","Hjortene ved havnen – vink farvel til stedet, hvor Kolossen stod"],
+             en:["The moat – the dry ditch around the wall is a green park today","A gelateria or a Greek café – you've earned it","The deer by the harbour – wave goodbye to where the Colossus stood"]},
+    story:{da:`Og så er vi tilbage ved Eleftherias-porten, hvor det hele begyndte. Tillykke – I har gået gennem mere end to tusind års historie i en af verdens bedst bevarede middelalderbyer!
+Tænk på alt det, I har mødt i dag: en kæmpe bronzestatue, der var et af verdens syv vidundere – og som 900 kameler bar væk. Riddere, der var munke, soldater og sygeplejere på én gang og serverede mad for de syge på sølvfade. En gade fuld af våbenskjolde. Et palads, der overlevede sultanens kæmpehær, men blev sprængt i luften af et lyn. En lyserød moské og et uret-tårn. En bazargade, en ugle på en fontæne, byens flotteste port – og en stille plads, hvor vi huskede dem, der boede der.
+Turens sidste spørgsmål: Hvilket stop var din favorit? Og hvis du skulle være én person fra byens historie i én dag – ridder, sultan, købmand eller måske uglen på fontænen – hvem ville du så være?
+Et sidste tip: Hvis I har mere energi, så gå en tur nede i den gamle voldgrav rundt om bymuren. Den er tør og i dag en grøn park – og dernede fra ser murene allermest imponerende ud. Ellers er tiden inde til den velfortjente belønning: en is eller en kold drik med udsigt til havnen.
+Tak, fordi I gik med! Rhodos siger farvel på græsk: "Yassas!" – og vink lige en sidste gang ud mod hjortene ved havnen, dér hvor solguden engang stod og skinnede over det hele.`,
+    en:`And here we are, back at Eleftherias Gate, where it all began. Congratulations – you've walked through more than two thousand years of history in one of the world's best-preserved medieval towns!
+Think of everything you've met today: a giant bronze statue that was one of the Seven Wonders of the World – and that 900 camels carried away. Knights who were monks, soldiers and nurses all at once, serving food to the sick on silver plates. A street full of coats of arms. A palace that survived the Sultan's enormous army but was blown up by a bolt of lightning. A pink mosque and a clock tower. A bazaar street, an owl on a fountain, the town's grandest gate – and a quiet square where we remembered those who lived there.
+The final question of the walk: which stop was your favourite? And if you could be one person from the town's history for a single day – knight, sultan, merchant, or perhaps the owl on the fountain – who would you be?
+One last tip: if you still have energy, take a walk down in the old moat around the town wall. It's dry, and today it's a green park – and from down there, the walls look their most impressive. Otherwise, it's time for your well-earned reward: an ice cream or a cold drink with a view of the harbour.
+Thank you for walking along! Rhodes says goodbye in Greek: "Yassas!" – and give one last wave towards the deer by the harbour, right where the sun god once stood shining over it all.`}
+  }
+]}
+};
 
 /* ============================================================
-   3) TILSTAND + LOCALSTORAGE
+   3) TILSTAND + LOCALSTORAGE (fremdrift pr. by)
    ============================================================ */
-const LS_KEY="trieste-city-walk-v1";
-let state={ current:0, completed:[], skipped:[], arrivedNotified:[], rate:1.0, volume:1.0, lang:"da", offlineReady:false };
-function loadState(){ try{ const raw=localStorage.getItem(LS_KEY); if(raw){ state=Object.assign(state,JSON.parse(raw)); } }catch(e){} }
+const LS_KEY="city-walks-v2";
+const LS_KEY_OLD="trieste-city-walk-v1";
+let state={ lang:"da", rate:1.0, volume:1.0, tour:null, tours:{} };
+let pendingChoice=false;
+
+function defaultProg(){ return {current:0, completed:[], skipped:[], arrivedNotified:[], offlineReady:false}; }
+function ensureProg(id){ if(!state.tours[id]) state.tours[id]=defaultProg(); return state.tours[id]; }
+function prog(){ return ensureProg(state.tour); }
+
+function loadState(){
+  try{
+    const raw=localStorage.getItem(LS_KEY);
+    if(raw){ state=Object.assign(state,JSON.parse(raw)); return; }
+    // Migrér fra den gamle Trieste-version, så en igangværende tur ikke mistes
+    const old=localStorage.getItem(LS_KEY_OLD);
+    if(old){
+      const o=JSON.parse(old);
+      state.lang=o.lang||"da"; state.rate=o.rate||1; state.volume=(o.volume==null?1:o.volume);
+      state.tour="trieste";
+      state.tours.trieste={current:o.current||0, completed:o.completed||[], skipped:o.skipped||[],
+        arrivedNotified:o.arrivedNotified||[], offlineReady:!!o.offlineReady};
+      saveState();
+    }
+  }catch(e){}
+}
 function saveState(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){} }
 
 /* ============================================================
    4) HJÆLPEFUNKTIONER
    ============================================================ */
+let STOPS=[];
 function distMeters(lat1,lng1,lat2,lng2){
   const R=6371000, rad=Math.PI/180;
   const dLat=(lat2-lat1)*rad, dLng=(lng2-lng1)*rad;
@@ -629,48 +873,55 @@ function toast(msg){
   el.textContent=msg; el.classList.add("show");
   clearTimeout(el._tm); el._tm=setTimeout(()=>el.classList.remove("show"),3200);
 }
-function isDone(id){ return state.completed.includes(id); }
-function isSkipped(id){ return state.skipped.includes(id); }
+function isDone(id){ return prog().completed.includes(id); }
+function isSkipped(id){ return prog().skipped.includes(id); }
 function nextOpenStop(){ return STOPS.find(s=>!isDone(s.id)&&!isSkipped(s.id))||null; }
-const L8=(obj)=>obj[state.lang]||obj.da; // vælg tekst på aktivt sprog
+const L8=(obj)=>obj[state.lang]||obj.da;
 
 /* ============================================================
-   5) KORT (Leaflet + OSM + gratis satellitlag)
+   5) KORT
    ============================================================ */
-let map=null, userMarker=null, accCircle=null, stopMarkers=[], layerCtl=null;
+let map=null, userMarker=null, accCircle=null, stopMarkers=[], routeLayer=null;
 let userPos=null, userAcc=null;
 
 function initMap(){
   const el=document.getElementById("map");
   if(typeof L==="undefined"){ el.outerHTML='<div class="map-fallback">'+t("mapFail")+'</div>'; return; }
   try{
-    map=L.map("map",{zoomControl:true}).setView([45.6500,13.7700],15);
+    const tour=TOURS[state.tour];
+    map=L.map("map",{zoomControl:true}).setView(tour.center,tour.zoom);
     const osm=L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(map);
     const sat=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:19,attribution:"© Esri World Imagery"});
-    layerCtl=L.control.layers({[t("layerMap")]:osm,[t("layerSat")]:sat},null,{position:"topleft"}).addTo(map);
-
-    L.polyline(STOPS.map(s=>[s.lat,s.lng]),{color:"#C0603A",weight:4,opacity:.85,dashArray:"2 8",lineCap:"round"}).addTo(map);
-
-    STOPS.forEach(s=>{
-      const icon=L.divIcon({className:"",iconSize:[32,32],iconAnchor:[16,30],
-        html:`<div class="stop-marker" id="marker-${s.id}"><span>${s.id+1}</span></div>`});
-      const m=L.marker([s.lat,s.lng],{icon}).addTo(map);
-      stopMarkers.push(m);
-    });
-    refreshMarkers(); refreshPopups();
+    L.control.layers({[t("layerMap")]:osm,[t("layerSat")]:sat},null,{position:"topleft"}).addTo(map);
+    routeLayer=L.layerGroup().addTo(map);
+    buildTourLayers();
   }catch(e){
     el.outerHTML='<div class="map-fallback">'+t("mapFail")+'</div>'; map=null;
   }
+}
+// (Gen)opbygger rute og markører for den valgte by
+function buildTourLayers(){
+  if(!map||!routeLayer) return;
+  routeLayer.clearLayers(); stopMarkers=[];
+  L.polyline(STOPS.map(s=>[s.lat,s.lng]),{color:"#C0603A",weight:4,opacity:.85,dashArray:"2 8",lineCap:"round"}).addTo(routeLayer);
+  STOPS.forEach(s=>{
+    const icon=L.divIcon({className:"",iconSize:[32,32],iconAnchor:[16,30],
+      html:`<div class="stop-marker" id="marker-${s.id}"><span>${s.id+1}</span></div>`});
+    const m=L.marker([s.lat,s.lng],{icon}).addTo(routeLayer);
+    stopMarkers.push(m);
+  });
+  const tour=TOURS[state.tour];
+  map.setView(tour.center,tour.zoom);
+  refreshMarkers(); refreshPopups();
 }
 function refreshMarkers(){
   STOPS.forEach(s=>{
     const el=document.getElementById("marker-"+s.id);
     if(!el) return;
     el.classList.toggle("done",isDone(s.id));
-    el.classList.toggle("here",s.id===state.current&&!isDone(s.id));
+    el.classList.toggle("here",s.id===prog().current&&!isDone(s.id));
   });
 }
-// Popup-tekster afhænger af sproget og genopbygges ved sprogskift
 function refreshPopups(){
   stopMarkers.forEach((m,i)=>{
     const s=STOPS[i];
@@ -679,7 +930,7 @@ function refreshPopups(){
   });
 }
 function openStopFromMap(id){
-  state.current=id; saveState();
+  prog().current=id; saveState();
   if(map) map.closePopup();
   showView("view-current"); renderAll();
 }
@@ -690,7 +941,7 @@ function openStopFromMap(id){
 let lastGpsKey="gpsWait", lastGpsVars={};
 function setGpsTexts(key,vars){
   lastGpsKey=key; lastGpsVars=vars||{};
-  document.getElementById("gpsInfo").textContent=tf(key,vars)+(key.startsWith("gpsDen")||key.startsWith("gpsUn")||key.startsWith("gpsTim")?t("gpsHttps"):"");
+  document.getElementById("gpsInfo").textContent=tf(key,vars)+(key==="gpsDenied"||key==="gpsUnavail"||key==="gpsTimeout"?t("gpsHttps"):"");
 }
 function startGeolocation(){
   if(!("geolocation" in navigator)){
@@ -725,9 +976,9 @@ const ARRIVE_RADIUS=50;
 function checkProximity(){
   if(!userPos) return;
   STOPS.forEach(s=>{
-    if(isDone(s.id)||state.arrivedNotified.includes(s.id)) return;
+    if(isDone(s.id)||prog().arrivedNotified.includes(s.id)) return;
     if(distMeters(userPos.lat,userPos.lng,s.lat,s.lng)<=ARRIVE_RADIUS){
-      state.arrivedNotified.push(s.id); saveState();
+      prog().arrivedNotified.push(s.id); saveState();
       toast(tf("arrivedToast",{n:s.id+1,name:L8(s.name)}));
       renderAll();
     }
@@ -736,22 +987,20 @@ function checkProximity(){
 
 /* ============================================================
    7) LYD – Web Speech API
-   Sætning-for-sætning med naturlige pauser. Pause implementeres
-   som stop+husk-sætning (iOS' indbyggede pause virker kun én gang).
-   Stemmen vælges efter det aktive sprog.
+   Sætning-for-sætning med naturlige pauser, spolbar afspilning
+   og pause via stop+husk-sætning (iOS-venligt).
    ============================================================ */
 let activeVoice=null, speakingStop=null, isPaused=false;
 let speechQueue=[], speechIdx=0, gapTimer=null, inGap=false;
-let speechGen=0;                 // generationstæller: gør spoling/stop immun over for forsinkede onend-events
-let storyOpen=false, lastStoryStop=-1, seekDragging=false;
+let speechGen=0;
+let storyOpen=false, lastStoryKey="", seekDragging=false;
 
 function pickVoice(){
   if(!("speechSynthesis" in window)){
     document.getElementById("voiceInfo").textContent=t("noSpeechSetting"); return;
   }
   const voices=speechSynthesis.getVoices();
-  const prefix=state.lang; // "da" eller "en"
-  const cand=voices.filter(v=>v.lang&&v.lang.toLowerCase().startsWith(prefix));
+  const cand=voices.filter(v=>v.lang&&v.lang.toLowerCase().startsWith(state.lang));
   activeVoice=cand.find(v=>/enhanced|premium|forbedret|natural|siri/i.test(v.name))||cand[0]||null;
   const info=document.getElementById("voiceInfo");
   if(activeVoice){
@@ -776,7 +1025,7 @@ function speakNext(){
     speakingStop=null; inGap=false; renderAll(); return;
   }
   inGap=false;
-  const gen=speechGen;             // hører denne sætning stadig til den aktive afspilning?
+  const gen=speechGen;
   const item=speechQueue[speechIdx++];
   const u=new SpeechSynthesisUtterance(item.text);
   u.lang=state.lang==="da"?"da-DK":"en-GB";
@@ -796,7 +1045,7 @@ function playStop(id){
   if(!("speechSynthesis" in window)){ toast(t("noSpeech")); return; }
   stopSpeech();
   speakingStop=id; isPaused=false; speechIdx=0;
-  storyOpen=true;                 // vis teksten, så man kan læse med
+  storyOpen=true;
   speechQueue=buildSpeechQueue(L8(STOPS[id].story));
   speakNext(); renderAll();
 }
@@ -805,7 +1054,7 @@ function pauseSpeech(){
   if(!isPaused){
     isPaused=true; speechGen++;
     clearTimeout(gapTimer);
-    if(!inGap&&speechIdx>0) speechIdx--;   // genoptag fra den afbrudte sætning
+    if(!inGap&&speechIdx>0) speechIdx--;
     try{ speechSynthesis.cancel(); }catch(e){}
   }else{
     isPaused=false; speakNext();
@@ -819,8 +1068,6 @@ function stopSpeech(){
   speakingStop=null; isPaused=false; inGap=false; speechQueue=[]; speechIdx=0;
   renderAll();
 }
-
-/* --- Afspilningslinje: spol til en vilkårlig sætning i fortællingen --- */
 function updateSeekUI(){
   if(seekDragging) return;
   const sEl=document.getElementById("seek");
@@ -830,15 +1077,15 @@ function updateSeekUI(){
   const pEl=document.getElementById("seekPct");
   if(pEl) pEl.textContent=Math.round(speechIdx/Math.max(1,speechQueue.length)*100)+" %";
 }
-function seekPreview(v){            // mens man trækker: vis kun procenten
+function seekPreview(v){
   seekDragging=true;
   const pEl=document.getElementById("seekPct");
   if(pEl) pEl.textContent=Math.round((parseInt(v,10)+1)/Math.max(1,speechQueue.length)*100)+" %";
 }
-function seekTo(v){                 // når man slipper: hop til sætningen
+function seekTo(v){
   seekDragging=false;
   if(speakingStop===null) return;
-  speechGen++;                      // gør evt. hængende onend-events ugyldige
+  speechGen++;
   clearTimeout(gapTimer); inGap=false;
   try{ speechSynthesis.cancel(); }catch(e){}
   speechIdx=Math.max(0,Math.min(speechQueue.length-1,parseInt(v,10)||0));
@@ -846,31 +1093,52 @@ function seekTo(v){                 // når man slipper: hop til sætningen
 }
 
 /* ============================================================
-   8) SPROGSKIFT
+   8) SPROG- OG BYSKIFT
    ============================================================ */
 function setLang(lang){
   if(state.lang===lang) return;
-  stopSpeech();                 // stop oplæsning ved sprogskift
+  stopSpeech();
   state.lang=lang; saveState();
   pickVoice(); applyLanguage(); renderAll();
 }
-// Opdaterer alle statiske tekster i brugerfladen
+function loadTour(){
+  STOPS=TOURS[state.tour].stops;
+  buildTourLayers();
+}
+function setTour(id){
+  if(state.tour===id&&!pendingChoice) return;
+  stopSpeech();
+  state.tour=id; ensureProg(id); pendingChoice=false; saveState();
+  loadTour(); applyLanguage(); renderAll();
+  toast(tf("tourSwitched",{name:L8(TOURS[id].cityName)}));
+}
+function chooseTour(id){
+  state.tour=id; ensureProg(id); pendingChoice=false; saveState();
+  document.getElementById("tourPicker").style.display="none";
+  loadTour(); applyLanguage(); renderAll(); sizeMap();
+}
 function applyLanguage(){
   document.documentElement.lang=state.lang;
+  const tour=TOURS[state.tour];
   const set=(id,key)=>{ const el=document.getElementById(id); if(el) el.textContent=t(key); };
+  document.getElementById("appTitle").textContent=L8(tour.title);
+  document.title=L8(tour.title);
   set("navMap","navMap"); set("navCurrent","navCurrent"); set("navAll","navAll"); set("navSettings","navSettings");
   set("btnMyPos","btnMyPos"); set("btnNextStop","btnNextStop");
   set("allTitle","allTitle"); set("btnReset","reset");
   set("settingsTitle","settingsTitle"); set("lblLang","lblLang");
   set("lblRate","lblRate"); set("lblVolume","lblVolume"); set("lblVoice","lblVoice");
   set("lblGps","lblGps"); set("btnCompassPerm","btnCompass"); set("compassHint","compassHint");
-  set("aboutTitle","aboutTitle"); set("aboutText","aboutText");
   set("lblOffline","lblOffline"); set("btnOffline","btnOffline");
-  document.getElementById("offlineInfo").textContent=t("offlineHint")+(state.offlineReady?" "+t("offlineDone"):"");
+  document.getElementById("aboutTitle").textContent=t("aboutTitle");
+  document.getElementById("aboutText").textContent=L8(tour.about);
   document.getElementById("gpsNote").innerHTML=t("gpsNote");
-  document.getElementById("routeSummary").textContent=t("routeSummary");
+  document.getElementById("routeSummary").textContent=L8(tour.summary);
+  document.getElementById("offlineInfo").textContent=t("offlineHint")+(prog().offlineReady?" "+t("offlineDone"):"");
   document.getElementById("langDa").classList.toggle("on",state.lang==="da");
   document.getElementById("langEn").classList.toggle("on",state.lang==="en");
+  document.getElementById("tourTrieste").classList.toggle("on",state.tour==="trieste");
+  document.getElementById("tourRhodos").classList.toggle("on",state.tour==="rhodos");
   setGpsTexts(lastGpsKey,lastGpsVars);
   if(userMarker) userMarker.bindPopup(t("youAreHere"));
   refreshPopups();
@@ -881,30 +1149,32 @@ function applyLanguage(){
    9) NAVIGATION MELLEM STOP
    ============================================================ */
 function markDone(id){
-  if(!isDone(id)) state.completed.push(id);
-  state.skipped=state.skipped.filter(x=>x!==id);
+  const p=prog();
+  if(!isDone(id)) p.completed.push(id);
+  p.skipped=p.skipped.filter(x=>x!==id);
   stopSpeech();
   const nxt=nextOpenStop();
-  if(nxt){ state.current=nxt.id; toast(tf("doneToast",{name:L8(nxt.name)})); }
+  if(nxt){ p.current=nxt.id; toast(tf("doneToast",{name:L8(nxt.name)})); }
   else{ toast(t("allDoneToast")); }
   saveState(); renderAll();
 }
 function skipStop(id){
-  if(!isSkipped(id)) state.skipped.push(id);
+  const p=prog();
+  if(!isSkipped(id)) p.skipped.push(id);
   stopSpeech();
   const nxt=nextOpenStop();
-  if(nxt) state.current=nxt.id;
+  if(nxt) p.current=nxt.id;
   toast(t("skipToast"));
   saveState(); renderAll();
 }
 function gotoStop(id){
-  state.current=Math.max(0,Math.min(STOPS.length-1,id));
+  prog().current=Math.max(0,Math.min(STOPS.length-1,id));
   saveState(); renderAll();
 }
 function resetTour(){
   if(!confirm(t("resetConfirm"))) return;
   stopSpeech();
-  state.current=0; state.completed=[]; state.skipped=[]; state.arrivedNotified=[];
+  state.tours[state.tour]=defaultProg();
   saveState(); renderAll(); toast(t("resetDone"));
 }
 
@@ -921,9 +1191,10 @@ function mapsLinks(s){
   </div>`;
 }
 function renderCurrentStop(){
-  const s=STOPS[state.current];
-  if(lastStoryStop!==s.id){ storyOpen=false; lastStoryStop=s.id; } // nyt stop → luk tekstpanelet
-  const done=isDone(s.id), arrived=state.arrivedNotified.includes(s.id);
+  const s=STOPS[prog().current];
+  const storyKey=state.tour+"-"+s.id;
+  if(lastStoryKey!==storyKey){ storyOpen=false; lastStoryKey=storyKey; }
+  const done=isDone(s.id), arrived=prog().arrivedNotified.includes(s.id);
   const speaking=speakingStop===s.id;
   const d=userPos?distMeters(userPos.lat,userPos.lng,s.lat,s.lng):null;
   const badges=[
@@ -934,7 +1205,6 @@ function renderCurrentStop(){
     speaking?`<span class="badge speaking">${isPaused?t("pausedBadge"):t("playingNow")}</span>`:""
   ].join("");
 
-  // Afspilningslinje vises, når dette stops fortælling er i gang eller på pause
   const seekBar=speaking?`
     <div style="margin-top:10px;">
       <input type="range" id="seek" min="0" max="${Math.max(0,speechQueue.length-1)}"
@@ -985,15 +1255,14 @@ function renderCurrentStop(){
       <button onclick="skipStop(${s.id})" ${done||isSkipped(s.id)?"disabled":""}>${t("skip")}</button>
     </div>
   </div>`;
-  // Husk om tekstpanelet er åbent, så GPS-opdateringer ikke lukker det
   const box=document.getElementById("storyBox");
   if(box) box.addEventListener("toggle",()=>{ storyOpen=box.open; });
 }
 function renderAllStops(){
-  document.getElementById("routeSummary").textContent=t("routeSummary");
+  document.getElementById("routeSummary").textContent=L8(TOURS[state.tour].summary);
   document.getElementById("allStopsContainer").innerHTML=STOPS.map(s=>{
     const d=userPos?fmtDist(distMeters(userPos.lat,userPos.lng,s.lat,s.lng)):null;
-    const status=isDone(s.id)?"✅":isSkipped(s.id)?"⏭":s.id===state.current?"📍":"○";
+    const status=isDone(s.id)?"✅":isSkipped(s.id)?"⏭":s.id===prog().current?"📍":"○";
     const tail=s.walkMin?tf("minToNext",{m:s.walkMin}):t("endsHere");
     return `<button class="stop-row card" style="padding:14px;" onclick="openStopFromMap(${s.id})">
       <div class="stop-num ${isDone(s.id)?"done":""}" style="width:38px;height:38px;font-size:1.05rem;">${s.id+1}</div>
@@ -1006,17 +1275,18 @@ function renderAllStops(){
   }).join("");
 }
 function renderHeader(){
-  const doneCount=state.completed.length;
+  const p=prog();
+  const doneCount=p.completed.length;
   const pct=Math.round(doneCount/STOPS.length*100);
   document.getElementById("progressFill").style.width=pct+"%";
   document.getElementById("hdrDone").textContent=`${doneCount} ${t("ofStops")}`;
   document.getElementById("hdrPct").textContent=pct+" %";
-  const cur=STOPS[state.current];
+  const cur=STOPS[p.current];
   document.getElementById("hdrCurrent").textContent=t("now")+": "+(cur?`${cur.id+1}. ${L8(cur.name)}`:"–");
-  const nxt=STOPS[state.current+1];
+  const nxt=STOPS[p.current+1];
   document.getElementById("hdrNext").textContent=t("next")+": "+(nxt?`${nxt.id+1}. ${L8(nxt.name)}`:t("goal"));
   let rem=0;
-  for(let i=state.current;i<STOPS.length-1;i++){
+  for(let i=p.current;i<STOPS.length-1;i++){
     rem+=distMeters(STOPS[i].lat,STOPS[i].lng,STOPS[i+1].lat,STOPS[i+1].lng);
   }
   document.getElementById("hdrRemaining").textContent=t("approx")+" "+fmtDist(rem*1.25)+" "+t("left");
@@ -1035,11 +1305,8 @@ function updateDistances(){
 function renderAll(){ renderHeader(); renderCurrentStop(); renderAllStops(); refreshMarkers(); }
 
 /* ============================================================
-   11) VISNINGSSKIFT
+   11) VISNINGSSKIFT + kortstørrelse
    ============================================================ */
-// Kortet skal fylde præcis pladsen mellem toptavle og bundmenu.
-// Vi måler de faktiske højder (de varierer med sprog og enhed)
-// og lytter på visualViewport, da Safari's værktøjslinje ændrer højden.
 function sizeMap(){
   const mapEl=document.getElementById("map");
   if(!mapEl) return;
@@ -1109,12 +1376,9 @@ volEl.addEventListener("input",()=>{
 
 /* ============================================================
    14) OFFLINE (service worker + download af kortfliser)
-   Service workeren (sw.js) cacher app-skallen og alle kortfliser,
-   den ser. Knappen herunder henter derudover hele rutens område
-   på forhånd (zoom 14–18), så kortet virker helt uden internet.
    ============================================================ */
 if("serviceWorker" in navigator){
-  navigator.serviceWorker.register("./sw.js").catch(()=>{ /* fx file:// – appen virker stadig online */ });
+  navigator.serviceWorker.register("./sw.js").catch(()=>{});
 }
 function lon2tile(lng,z){ return Math.floor((lng+180)/360*Math.pow(2,z)); }
 function lat2tile(lat,z){ const r=lat*Math.PI/180;
@@ -1123,7 +1387,6 @@ function lat2tile(lat,z){ const r=lat*Math.PI/180;
 async function downloadOffline(){
   const btn=document.getElementById("btnOffline");
   if(!("caches" in window)){ toast(t("offlineNoSw")); return; }
-  // Afgræns rutens område med lidt luft omkring
   const lats=STOPS.map(s=>s.lat), lngs=STOPS.map(s=>s.lng), pad=0.004;
   const minLat=Math.min(...lats)-pad, maxLat=Math.max(...lats)+pad;
   const minLng=Math.min(...lngs)-pad, maxLng=Math.max(...lngs)+pad;
@@ -1138,7 +1401,6 @@ async function downloadOffline(){
   let done=0, failed=0;
   try{
     const cache=await caches.open("trieste-tiles-v1");
-    // Hent i små bundter, så telefonen ikke overbelastes
     for(let i=0;i<urls.length;i+=6){
       await Promise.all(urls.slice(i,i+6).map(async u=>{
         try{
@@ -1153,7 +1415,7 @@ async function downloadOffline(){
   btn.disabled=false; btn.textContent=t("btnOffline");
   if(failed>urls.length*0.1){ toast(t("offlineFail")); }
   else{
-    state.offlineReady=true; saveState();
+    prog().offlineReady=true; saveState();
     document.getElementById("offlineInfo").textContent=t("offlineHint")+" "+t("offlineDone");
     toast(t("offlineDone"));
   }
@@ -1162,13 +1424,21 @@ document.getElementById("btnOffline").addEventListener("click",downloadOffline);
 
 /* ============================================================
    15) OPSTART
+   Byvalget huskes; første gang vises byvælgeren.
    ============================================================ */
 loadState();
+if(!state.tour){
+  state.tour="trieste";           // midlertidigt, så appen kan tegnes bag overlayet
+  pendingChoice=true;
+  document.getElementById("tourPicker").style.display="block";
+}
+ensureProg(state.tour);
+STOPS=TOURS[state.tour].stops;
 rateEl.value=state.rate; volEl.value=state.volume;
 document.getElementById("rateVal").textContent=state.rate.toFixed(1).replace(".",state.lang==="da"?",":".")+"×";
 document.getElementById("volVal").textContent=Math.round(state.volume*100)+" %";
 initMap();
-sizeMap(); setTimeout(sizeMap,300);   // igen efter layout er faldet på plads
+sizeMap(); setTimeout(sizeMap,300);
 applyLanguage();
 startGeolocation();
 pickVoice();
