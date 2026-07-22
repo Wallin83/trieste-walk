@@ -281,6 +281,14 @@ nav button.active{color:var(--sea);}
     </div>
 
     <div class="card">
+      <div class="setting" style="margin-bottom:6px;">
+        <label id="lblOffline"></label>
+        <div class="hint" id="offlineInfo"></div>
+      </div>
+      <button id="btnOffline" class="btn-primary" style="width:100%; margin-top:8px;"></button>
+    </div>
+
+    <div class="card">
       <strong id="aboutTitle"></strong>
       <p class="hint" id="aboutText" style="margin:8px 0 0;"></p>
     </div>
@@ -316,6 +324,11 @@ da:{
   lblRate:"Talehastighed:", lblVolume:"Lydstyrke:", lblVoice:"Oplæsningsstemme",
   lblGps:"GPS-status", btnCompass:"Aktivér kompas",
   compassHint:"På iPhone skal kompasset have din tilladelse først.",
+  lblOffline:"Offline", btnOffline:"Hent kort til offline-brug", btnOfflineBusy:"Henter … {p} %",
+  offlineHint:"Henter ca. 5 MB kortudsnit for hele ruten. Fortællinger og GPS virker allerede uden internet – oplæsning kræver blot en hentet stemme på telefonen.",
+  offlineDone:"Offline-kort er hentet ✓ Appen virker nu uden internet.",
+  offlineFail:"Nogle kortfliser kunne ikke hentes – prøv igen på wi-fi.",
+  offlineNoSw:"Offline kræver HTTPS – det virker på jeres webadresse, men ikke fra en lokal fil.",
   aboutTitle:"Om turen",
   aboutText:"Ca. 3,5 km til fods gennem Triestes historiske centrum – regn med 2–3 timer med stop, is og pauser. Turen starter og slutter ved The Modernist Hotel, Corso Italia 12. God tur!",
   play:"▶︎ Afspil fortælling", pause:"Pause", resume:"Fortsæt", stop:"Stop",
@@ -363,6 +376,11 @@ en:{
   lblRate:"Speech rate:", lblVolume:"Volume:", lblVoice:"Narration voice",
   lblGps:"GPS status", btnCompass:"Enable compass",
   compassHint:"On iPhone the compass needs your permission first.",
+  lblOffline:"Offline", btnOffline:"Download maps for offline use", btnOfflineBusy:"Downloading … {p} %",
+  offlineHint:"Downloads ~5 MB of map tiles for the whole route. Stories and GPS already work without internet – narration just requires a downloaded voice on the phone.",
+  offlineDone:"Offline maps downloaded ✓ The app now works without internet.",
+  offlineFail:"Some map tiles failed to download – try again on wi-fi.",
+  offlineNoSw:"Offline requires HTTPS – it works on your web address, but not from a local file.",
   aboutTitle:"About the walk",
   aboutText:"Approx. 3.5 km on foot through Trieste's historic centre – allow 2–3 hours with stops, gelato and breaks. The tour starts and ends at The Modernist Hotel, Corso Italia 12. Enjoy!",
   play:"▶︎ Play story", pause:"Pause", resume:"Resume", stop:"Stop",
@@ -588,7 +606,7 @@ Thank you for walking along. Trieste says arrivederci – see you again. And who
    3) TILSTAND + LOCALSTORAGE
    ============================================================ */
 const LS_KEY="trieste-city-walk-v1";
-let state={ current:0, completed:[], skipped:[], arrivedNotified:[], rate:1.0, volume:1.0, lang:"da" };
+let state={ current:0, completed:[], skipped:[], arrivedNotified:[], rate:1.0, volume:1.0, lang:"da", offlineReady:false };
 function loadState(){ try{ const raw=localStorage.getItem(LS_KEY); if(raw){ state=Object.assign(state,JSON.parse(raw)); } }catch(e){} }
 function saveState(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){} }
 
@@ -627,7 +645,7 @@ function initMap(){
   if(typeof L==="undefined"){ el.outerHTML='<div class="map-fallback">'+t("mapFail")+'</div>'; return; }
   try{
     map=L.map("map",{zoomControl:true}).setView([45.6500,13.7700],15);
-    const osm=L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(map);
+    const osm=L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(map);
     const sat=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:19,attribution:"© Esri World Imagery"});
     layerCtl=L.control.layers({[t("layerMap")]:osm,[t("layerSat")]:sat},null,{position:"topleft"}).addTo(map);
 
@@ -847,6 +865,8 @@ function applyLanguage(){
   set("lblRate","lblRate"); set("lblVolume","lblVolume"); set("lblVoice","lblVoice");
   set("lblGps","lblGps"); set("btnCompassPerm","btnCompass"); set("compassHint","compassHint");
   set("aboutTitle","aboutTitle"); set("aboutText","aboutText");
+  set("lblOffline","lblOffline"); set("btnOffline","btnOffline");
+  document.getElementById("offlineInfo").textContent=t("offlineHint")+(state.offlineReady?" "+t("offlineDone"):"");
   document.getElementById("gpsNote").innerHTML=t("gpsNote");
   document.getElementById("routeSummary").textContent=t("routeSummary");
   document.getElementById("langDa").classList.toggle("on",state.lang==="da");
@@ -1088,7 +1108,60 @@ volEl.addEventListener("input",()=>{
 });
 
 /* ============================================================
-   14) OPSTART
+   14) OFFLINE (service worker + download af kortfliser)
+   Service workeren (sw.js) cacher app-skallen og alle kortfliser,
+   den ser. Knappen herunder henter derudover hele rutens område
+   på forhånd (zoom 14–18), så kortet virker helt uden internet.
+   ============================================================ */
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("./sw.js").catch(()=>{ /* fx file:// – appen virker stadig online */ });
+}
+function lon2tile(lng,z){ return Math.floor((lng+180)/360*Math.pow(2,z)); }
+function lat2tile(lat,z){ const r=lat*Math.PI/180;
+  return Math.floor((1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*Math.pow(2,z)); }
+
+async function downloadOffline(){
+  const btn=document.getElementById("btnOffline");
+  if(!("caches" in window)){ toast(t("offlineNoSw")); return; }
+  // Afgræns rutens område med lidt luft omkring
+  const lats=STOPS.map(s=>s.lat), lngs=STOPS.map(s=>s.lng), pad=0.004;
+  const minLat=Math.min(...lats)-pad, maxLat=Math.max(...lats)+pad;
+  const minLng=Math.min(...lngs)-pad, maxLng=Math.max(...lngs)+pad;
+  const urls=[];
+  [14,15,16,17,18].forEach(z=>{
+    const x1=lon2tile(minLng,z), x2=lon2tile(maxLng,z);
+    const y1=lat2tile(maxLat,z), y2=lat2tile(minLat,z);
+    for(let x=x1;x<=x2;x++) for(let y=y1;y<=y2;y++)
+      urls.push(`https://tile.openstreetmap.org/${z}/${x}/${y}.png`);
+  });
+  btn.disabled=true;
+  let done=0, failed=0;
+  try{
+    const cache=await caches.open("trieste-tiles-v1");
+    // Hent i små bundter, så telefonen ikke overbelastes
+    for(let i=0;i<urls.length;i+=6){
+      await Promise.all(urls.slice(i,i+6).map(async u=>{
+        try{
+          if(await cache.match(u)){ done++; return; }
+          const res=await fetch(u,{mode:"no-cors"});
+          await cache.put(u,res); done++;
+        }catch(e){ failed++; }
+      }));
+      btn.textContent=tf("btnOfflineBusy",{p:Math.round((done+failed)/urls.length*100)});
+    }
+  }catch(e){ failed++; }
+  btn.disabled=false; btn.textContent=t("btnOffline");
+  if(failed>urls.length*0.1){ toast(t("offlineFail")); }
+  else{
+    state.offlineReady=true; saveState();
+    document.getElementById("offlineInfo").textContent=t("offlineHint")+" "+t("offlineDone");
+    toast(t("offlineDone"));
+  }
+}
+document.getElementById("btnOffline").addEventListener("click",downloadOffline);
+
+/* ============================================================
+   15) OPSTART
    ============================================================ */
 loadState();
 rateEl.value=state.rate; volEl.value=state.volume;
